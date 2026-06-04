@@ -581,19 +581,19 @@ function openApp(key) {
   appScreen.classList.add('open');
 }
 
-/* Minimize the open app: zoom it down onto its recents card (scroll-up in app).
-   The app lifts above the overview and scales to the exact centred-card rect
-   (left 108, top 113, 324x372 = scale 0.6 from the top-left), so when it's
-   removed the identical card is revealed underneath with no jump. */
-function minimizeAppIntoRecents() {
-  recentsLatched = true;
-  dock.classList.add('revealed');
-  currentApp = null;                       // the app becomes the centred card
-  buildRecentsPreview();
-  recentsPreview.classList.add('no-scale'); // cards at final scale, fade opacity only
-  showRecentsView();
+/* Begin minimizing the open app the instant the swipe reveals the overview.
+   The app lifts above the dim + recents (z15) and zooms into its centred card
+   rect (left 108, top 113, 324x372 = scale 0.6 from top-left). As it shrinks
+   it reveals the dimmed HOME behind it, and when removed the identical card is
+   already there underneath. currentApp is cleared so the app becomes the
+   most-recent card and the rest of the drag proceeds normally. */
+function startMinimize() {
+  if (!currentApp) return;
+  currentApp = null;                        // app becomes the most-recent card
+  buildRecentsPreview();                    // app is the centred card
+  recentsPreview.classList.add('no-scale'); // card pinned at its final position
 
-  appScreen.classList.add('minimizing');    // z-index above overview + transform transition
+  appScreen.classList.add('minimizing');    // z15 — above dim + recents
   appScreen.style.transformOrigin = 'top left';
   void appScreen.offsetWidth;               // commit the full-size start state
   appScreen.style.transform = 'translate(108px, 113px) scale(0.6)';
@@ -724,7 +724,8 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (dy > 8 && !revealed) {
       revealed = true;
       dock.classList.add('revealed');
-      updateOverview();           // show the surface for the current (centre) slot
+      if (currentApp) startMinimize(); // app zooms into its card; dimmed home stays behind
+      updateOverview();                // show the surface for the current (centre) slot
     }
     if (!revealed) return;
     updateActiveAndFan(e2.clientX, e2.clientY);
@@ -753,7 +754,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
 function routeRelease() {
   const app = activeApp();
   if (app === 'running') {
-    if (currentApp) minimizeAppIntoRecents(); else latchRecents();
+    latchRecents(); // the app (if any) was already minimized when the drag began
   } else if (app === 'favourites') {
     if (favSelected >= 0) {
       const fav = FAVOURITES[favSelected];
@@ -804,7 +805,10 @@ function goHome() {
   recentsLatched = false;
   panelsLatched = false;
   currentApp = null;
-  appScreen.classList.remove('open');
+  appScreen.classList.remove('open', 'minimizing');
+  appScreen.style.transform = '';
+  appScreen.style.transformOrigin = '';
+  recentsPreview.classList.remove('no-scale');
   panels.classList.remove('open');
   hideRecentsView();
   recentsBg.classList.remove('visible');
