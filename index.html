@@ -100,22 +100,17 @@
     box-shadow: 0 8px 30px rgba(0,0,0,0.35);
   }
 
-  /* ============ Notifications / Quick-settings panels (stub) ============ */
+  /* ============ Notifications / Quick-settings bottom drawers ============ */
   #panels {
     position: absolute;
-    left: 0;
-    top: 60px;
-    width: 540px;
-    height: 425px;       /* sits above the dock */
+    inset: 0;                /* full-frame drawer */
     z-index: 11;
     overflow: hidden;
-    opacity: 0;
-    transform: translateY(40px);
+    transform: translateY(100%);
     pointer-events: none;
-    transition: opacity 0.28s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1);
+    transition: transform 0.32s cubic-bezier(0.22,1,0.36,1);
   }
   #panels.open {
-    opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
   }
@@ -127,49 +122,39 @@
     transition: transform 0.28s cubic-bezier(0.22,1,0.36,1);
   }
   .panel {
+    position: relative;
     width: 540px;
-    height: 100%;
+    height: 620px;
     flex: none;
-    padding: 28px;
+    background: #535353;
+    background: color(display-p3 0.325 0.325 0.325);
   }
-  .panel h2 {
-    color: #fff;
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 16px;
-    opacity: 0.95;
-  }
-  .panel .ph-row {
-    height: 64px;
+  /* drawer cells (quick-settings tiles & notification cards) */
+  .cell {
+    position: absolute;
+    background: #2D2D2D;
+    background: color(display-p3 0.176 0.176 0.176);
     border-radius: 16px;
-    background: rgba(255,255,255,0.10);
-    margin-bottom: 12px;
   }
-  .panel .ph-tiles {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+  .cell.shadow {
+    box-shadow: 0 4px 4px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 4px color(display-p3 0 0 0 / 0.25);
   }
-  .panel .ph-tile {
-    height: 84px;
-    border-radius: 18px;
-    background: rgba(255,255,255,0.10);
-  }
-  /* page dots */
+  /* page dots — float just above the dock */
   #panel-dots {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 6px;
+    bottom: 104px;
     display: flex;
     gap: 7px;
-    z-index: 12;
+    z-index: 22;
     opacity: 0;
     transition: opacity 0.25s ease;
     pointer-events: none;
   }
   #panels.open ~ #panel-dots { opacity: 1; }
-  .pdot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.35); }
+  .pdot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.4); }
   .pdot.on { background: #fff; }
 
   /* ===================== Dock ===================== */
@@ -341,24 +326,29 @@
     <div id="recents-track"></div>
   </div>
 
-  <!-- Notifications / Quick-settings panels (stub) -->
+  <!-- Notifications / Quick-settings bottom drawers -->
   <div id="panels">
     <div id="panels-track">
+      <!-- Notifications: stacked cards -->
       <div class="panel" data-panel="notif">
-        <h2>Notifications</h2>
-        <div class="ph-row"></div>
-        <div class="ph-row"></div>
-        <div class="ph-row"></div>
-        <div class="ph-row"></div>
+        <div class="cell" style="left:113px;top:458px;width:314px;height:67px"></div>
+        <div class="cell" style="left:48px;top:346px;width:444px;height:93px"></div>
+        <div class="cell shadow" style="left:40px;top:331px;width:460px;height:97px"></div>
+        <div class="cell" style="left:40px;top:211px;width:460px;height:97px"></div>
+        <div class="cell" style="left:40px;top:91px;width:460px;height:97px"></div>
       </div>
+      <!-- Quick settings: tile grid -->
       <div class="panel" data-panel="qs">
-        <h2>Quick settings</h2>
-        <div class="ph-tiles">
-          <div class="ph-tile"></div>
-          <div class="ph-tile"></div>
-          <div class="ph-tile"></div>
-          <div class="ph-tile"></div>
-        </div>
+        <div class="cell" style="left:40px;top:176px;width:97px;height:97px"></div>
+        <div class="cell" style="left:161px;top:176px;width:97px;height:97px"></div>
+        <div class="cell" style="left:282px;top:176px;width:97px;height:97px"></div>
+        <div class="cell" style="left:403px;top:176px;width:97px;height:97px"></div>
+        <div class="cell" style="left:40px;top:295px;width:97px;height:97px"></div>
+        <div class="cell" style="left:161px;top:295px;width:97px;height:97px"></div>
+        <div class="cell" style="left:282px;top:295px;width:97px;height:97px"></div>
+        <div class="cell" style="left:403px;top:295px;width:97px;height:97px"></div>
+        <div class="cell" style="left:40px;top:423px;width:216px;height:97px"></div>
+        <div class="cell" style="left:280px;top:423px;width:216px;height:97px"></div>
       </div>
     </div>
   </div>
@@ -828,26 +818,43 @@ recentsPreview.addEventListener('pointerup', (e) => {
   }
 });
 
-/* ===================== panels: swipe between notif / qs ===================== */
-let pDragging=false, pStartX=0, pBase=0, pMoved=false;
+/* ===================== panels: swipe between notif/qs, swipe down to dismiss ===================== */
+let pDragging=false, pStartX=0, pStartY=0, pBase=0, pMode=null;
+const PANEL_DISMISS_PX = 90;
 panels.addEventListener('pointerdown', (e) => {
   if (!panelsLatched) return;
-  pDragging = true; pMoved = false;
-  pStartX = e.clientX; pBase = -540 * panelIndex;
+  pDragging = true; pMode = null;
+  pStartX = e.clientX; pStartY = e.clientY; pBase = -540 * panelIndex;
   panels.setPointerCapture(e.pointerId);
 });
 panels.addEventListener('pointermove', (e) => {
   if (!pDragging) return;
-  const dx = e.clientX - pStartX;
-  if (Math.abs(dx) > 8) pMoved = true;
-  panelsTrack.style.transition = 'none';
-  panelsTrack.style.transform = `translateX(${pBase + dx}px)`;
+  const dx = e.clientX - pStartX, dy = e.clientY - pStartY;
+  if (!pMode && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+    pMode = Math.abs(dy) > Math.abs(dx) ? 'vert' : 'horiz';
+  }
+  if (pMode === 'horiz') {
+    panelsTrack.style.transition = 'none';
+    panelsTrack.style.transform = `translateX(${pBase + dx}px)`;
+  } else if (pMode === 'vert' && dy > 0) {
+    panels.style.transition = 'none';
+    panels.style.transform = `translateY(${dy}px)`;
+  }
 });
 panels.addEventListener('pointerup', (e) => {
   if (!pDragging) return;
   pDragging = false;
+  const dx = e.clientX - pStartX, dy = e.clientY - pStartY;
+  if (pMode === 'vert') {
+    panels.style.transition = '';                 // restore smooth slide
+    const dismiss = dy > PANEL_DISMISS_PX;
+    requestAnimationFrame(() => {
+      panels.style.transform = '';                // hand back to the class transform
+      if (dismiss) hidePanels();
+    });
+    return;
+  }
   panelsTrack.style.transition = '';
-  const dx = e.clientX - pStartX;
   let idx = panelIndex;
   if (dx < -60) idx = 1; else if (dx > 60) idx = 0;
   setPanelIndex(idx);
