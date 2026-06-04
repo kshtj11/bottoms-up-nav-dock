@@ -211,17 +211,15 @@
     height: 73px;
   }
 
-  /* Each dock slot has a wide touch area with a 64px icon tray centred */
+  /* 5 equal-width slots, each a wide touch area with a 64px icon tray centred */
   .dock-icon {
-    width: 100px;
+    flex: 1;
     height: 73px;
-    flex: none;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
   }
-  .dock-icon.running { width: 64px; }
 
   .tray {
     width: 64px;
@@ -246,7 +244,7 @@
   /* ===================== Favourites fan-out ===================== */
   #fav-fan {
     position: absolute;
-    left: 30px;
+    left: 19px;           /* centred over the favourites slot */
     bottom: 109px;        /* directly above the dock */
     width: 316px;
     height: 64px;
@@ -642,6 +640,7 @@ function setActive(index) {
 //   search         → recents slide up, nothing else
 function updateOverview() {
   if (!dock.classList.contains('revealed')) return;
+  recentsBg.classList.add('visible'); // dim always sits over the home/app behind
   const app = activeApp();
   if (app === 'running') {
     hideDrawer(); closeFan(); slideRecents('in');
