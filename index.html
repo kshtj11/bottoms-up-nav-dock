@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=540, user-scalable=no">
+<title>Gesture Interaction Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #1a1a1a;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  #frame {
+    position: relative;
+    width: 540px;
+    height: 620px;
+    overflow: hidden;
+    background: #373737;
+    background: color(display-p3 0.216 0.216 0.216);
+  }
+
+  /* Home screen */
+  #home-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: #000 url('home.png') center / cover no-repeat;
+  }
+
+  /* Dim layer behind the recents carousel */
+  #recents-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    background: #000000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  #recents-bg.visible {
+    opacity: 0.75;
+    pointer-events: auto;
+  }
+
+  /* Full-screen opened app */
+  #app-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  #app-screen.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Recent apps preview (Frame 36) */
+  #recents-preview {
+    position: absolute;
+    top: 113px;
+    left: 0;
+    width: 540px;
+    height: 372px;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    overflow: visible;
+    opacity: 0;
+    transform: scale(0.92);
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #recents-preview.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+  #recents-track {
+    display: flex;
+    gap: 44px;
+    align-items: center;
+    will-change: transform;
+  }
+  .preview-card {
+    width: 324px;
+    height: 372px;
+    border-radius: 4px;
+    flex: none;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  }
+
+  /* Dock (Frame 5) */
+  #dock {
+    position: absolute;
+    left: 50%;
+    bottom: 26px; /* 16px deadzone + 10px gap */
+    transform: translateX(-50%) translateY(140px);
+    width: 464px;
+    height: 73px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    background: rgba(217, 217, 217, 0.2);
+    background: color(display-p3 0.851 0.851 0.851 / 0.2);
+    border-radius: 40px;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+    transition: transform 0.28s cubic-bezier(0.22,1,0.36,1), opacity 0.2s ease;
+  }
+  #dock.revealed {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #dock-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    width: 464px;
+    height: 73px;
+  }
+
+  /* Each dock slot is 100x72 (expanded touch area) with a 72x72 icon centred */
+  .dock-icon {
+    width: 100px;
+    height: 72px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  /* Centre slot is the running-apps indicator, slightly narrower */
+  .dock-icon.recent-slot {
+    width: 64px;
+    height: 73px;
+    padding: 19px 0;
+    align-items: flex-start;
+  }
+
+  .dock-svg {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    border-radius: 18px;
+    background: rgba(32,32,32,0.35);
+    background: color(display-p3 0.125 0.125 0.125 / 0.35);
+    transition: transform 0.18s ease;
+    pointer-events: none;
+  }
+  .dock-icon.active .dock-svg {
+    transform: scale(1.2);
+  }
+
+  /* Running-apps indicator: three overlapping rounded pills */
+  .rdot {
+    width: 35px;
+    height: 35px;
+    border-radius: 18px;
+    background: #AEAEAE;
+    background: color(display-p3 0.682 0.682 0.682);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    box-shadow: 0 1px 4px color(display-p3 0 0 0 / 0.25);
+    flex: none;
+  }
+  .rdot + .rdot { margin-left: -28px; }
+
+  /* Deadzone (Rectangle 37) — full-width black bar, visual only */
+  #deadzone {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 16px;
+    background: #111111;
+    background: color(display-p3 0.067 0.067 0.067);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 30;
+  }
+
+  /* Corner toggle pills */
+  .corner-toggle {
+    position: absolute;
+    top: 8px;
+    z-index: 40;
+    padding: 4px 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  #dock-fill-toggle { right: 8px; }
+  #edge-toggle      { left: 8px; }
+
+  #frame.dock-bare #dock { background: transparent; }
+  #frame.show-edges #deadzone,
+  #frame.show-edges #swipe-zone { opacity: 0.10; }
+
+  /* Active swipe-up zone — only the central 120px starts a gesture */
+  #swipe-zone {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 16px;
+    background: #808080;
+    background: color(display-p3 0.5 0.5 0.5);
+    border-radius: 8px 8px 0 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 31;
+    cursor: grab;
+  }
+</style>
+</head>
+<body>
+
+<div id="frame">
+  <!-- Home screen (image background) -->
+  <div id="home-screen"></div>
+
+  <!-- Opened app -->
+  <div id="app-screen"></div>
+
+  <!-- Dim layer behind the recents carousel -->
+  <div id="recents-bg"></div>
+
+  <!-- Recent apps preview -->
+  <div id="recents-preview">
+    <div id="recents-track"></div>
+  </div>
+
+  <!-- Dock -->
+  <div id="dock">
+    <div id="dock-row">
+      <div class="dock-icon" data-app="search">
+        <svg class="dock-svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10.5" cy="10.5" r="6.5"/>
+          <line x1="15.5" y1="15.5" x2="21" y2="21"/>
+        </svg>
+      </div>
+      <div class="dock-icon" data-app="green">
+        <img class="dock-svg" src="icons/notes-app-icon.png" alt="">
+      </div>
+      <div class="dock-icon recent-slot active" data-app="recent">
+        <span class="rdot"></span>
+        <span class="rdot"></span>
+        <span class="rdot"></span>
+      </div>
+      <div class="dock-icon" data-app="pink">
+        <img class="dock-svg" src="icons/camera-app-icon.png" alt="">
+      </div>
+      <div class="dock-icon" data-app="purple">
+        <img class="dock-svg" src="icons/music-app-icon.png" alt="">
+      </div>
+    </div>
+  </div>
+
+  <!-- Corner toggles -->
+  <div id="edge-toggle"      class="corner-toggle">Edges: OFF</div>
+  <div id="dock-fill-toggle" class="corner-toggle">Dock BG: ON</div>
+
+  <!-- Deadzone -->
+  <div id="deadzone"></div>
+  <!-- Central swipe-up zone -->
+  <div id="swipe-zone"></div>
+</div>
+
+<script>
+const frame = document.getElementById('frame');
+const swipeZone = document.getElementById('swipe-zone');
+const dock = document.getElementById('dock');
+const dockIcons = Array.from(document.querySelectorAll('.dock-icon'));
+const appScreen = document.getElementById('app-screen');
+const recentsPreview = document.getElementById('recents-preview');
+const recentsTrack = document.getElementById('recents-track');
+const recentsBg = document.getElementById('recents-bg');
+
+// Show/hide the recents view (cards + dim background together)
+function showRecentsView() {
+  recentsPreview.classList.add('visible');
+  recentsBg.classList.add('visible');
+}
+function hideRecentsView() {
+  recentsPreview.classList.remove('visible');
+  recentsBg.classList.remove('visible');
+}
+
+// App color map for full-screen open
+const APP_COLORS = {
+  search: '#DADADA',
+  green:  '#BEDE72',
+  pink:   '#FFBBBC',
+  purple: '#D4B2FF'
+};
+
+// Recent apps stack — index 0 is most recent (shown in middle of preview).
+// Entries are opaque "app keys": either an image path (image-backed app)
+// or a hex color (dock-launched app).
+let recents = ['recents/1.png', 'recents/2.png', 'recents/3.png'];
+// Key of the app currently in the foreground (null when on home)
+let currentApp = null;
+
+// Build a CSS background value for an app key (image or hex color)
+function appBg(key) {
+  if (typeof key === 'string' && key.endsWith('.png')) {
+    return `#000 url('${key}') center / cover no-repeat`;
+  }
+  return key;
+}
+
+const CARD_W = 324, CARD_GAP = 44, CARD_STEP = CARD_W + CARD_GAP; // 368
+let recentsCards = [];   // colors laid out left->right (oldest -> newest)
+let recentsIndex = 0;    // index of the currently centered card
+
+function buildRecentsPreview(animate = false) {
+  recentsTrack.innerHTML = '';
+  // Exclude the app you're currently in — don't show it in its own recents
+  recentsCards = recents.filter(c => c !== currentApp).reverse(); // rightmost = most recent
+  recentsCards.forEach((key) => {
+    const card = document.createElement('div');
+    card.className = 'preview-card';
+    card.style.background = appBg(key);
+    card.dataset.appKey = key;
+    recentsTrack.appendChild(card);
+  });
+  recentsIndex = Math.max(0, recentsCards.length - 1); // start on most recent (centered)
+  setRecentsOffset(offsetForIndex(recentsIndex), animate);
+}
+
+function offsetForIndex(i) {
+  const N = recentsCards.length;
+  return -(i - (N - 1) / 2) * CARD_STEP;
+}
+
+function setRecentsOffset(px, animate) {
+  recentsTrack.style.transition = animate
+    ? 'transform 0.28s cubic-bezier(0.22,1,0.36,1)'
+    : 'none';
+  recentsTrack.style.transform = `translateX(${px}px)`;
+}
+
+const RECENT_INDEX = 2; // center cyan icon position in dockIcons
+
+const FRAME_H = 620;
+const DEADZONE_H = 16;
+
+let gestureFrameRect = null; // frame rect cached for the duration of a drag
+let dragging = false;
+let revealed = false;
+let recentsLatched = false; // recents view kept open after release
+let activeIndex = RECENT_INDEX;
+let startY = 0;
+let lastY = 0;
+let crossedMiddle = false;
+// Velocity tracking for quick-flick-to-home
+let prevY = 0, prevT = 0, velocity = 0;
+const FLICK_VELOCITY = 0.9;   // px/ms upward = quick flick → home
+const LATCH_TRAVEL_PX = 120;  // upward travel that latches recents on release
+
+function setActive(index) {
+  if (index === activeIndex) return;
+  dockIcons[activeIndex].classList.remove('active');
+  dockIcons[index].classList.add('active');
+  activeIndex = index;
+
+  // Recents preview only shows when the recent (center) icon is active
+  if (activeIndex === RECENT_INDEX) {
+    showRecentsView();
+  } else {
+    hideRecentsView();
+  }
+}
+
+function nearestIconIndex(pointerX) {
+  let best = 0;
+  let bestDist = Infinity;
+  dockIcons.forEach((icon, i) => {
+    const r = icon.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const d = Math.abs(pointerX - cx);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+
+swipeZone.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  dragging = true;
+  revealed = false;
+  recentsLatched = false;
+  crossedMiddle = false;
+  startY = e.clientY;
+  lastY = e.clientY;
+  prevY = e.clientY;
+  prevT = performance.now();
+  velocity = 0;
+  gestureFrameRect = frame.getBoundingClientRect(); // frame doesn't move mid-drag
+
+  // Reset active to center (recent) by default
+  dockIcons.forEach(ic => ic.classList.remove('active'));
+  activeIndex = RECENT_INDEX;
+  dockIcons[RECENT_INDEX].classList.add('active');
+
+  buildRecentsPreview();
+  frame.setPointerCapture(e.pointerId);
+
+  const onMove = (e2) => {
+    if (!dragging) return;
+    lastY = e2.clientY;
+
+    // Track instantaneous upward velocity (px/ms)
+    const now = performance.now();
+    const dt = now - prevT;
+    if (dt > 0) {
+      velocity = (prevY - e2.clientY) / dt;
+      prevT = now;
+      prevY = e2.clientY;
+    }
+
+    const dy = startY - e2.clientY;
+
+    if (dy > 8 && !revealed) {
+      revealed = true;
+      dock.classList.add('revealed');
+      showRecentsView();
+    }
+
+    // Did the swipe travel far enough that release should latch recents?
+    if ((startY - e2.clientY) > LATCH_TRAVEL_PX) crossedMiddle = true;
+
+    if (revealed) {
+      const idx = nearestIconIndex(e2.clientX);
+      setActive(idx);
+    }
+  };
+
+  const onUp = (e2) => {
+    frame.removeEventListener('pointermove', onMove);
+    frame.removeEventListener('pointerup', onUp);
+    dragging = false;
+
+    // A quick upward flick goes home, regardless of swipe length.
+    // Ignore a stale velocity if the finger paused before releasing.
+    const sinceLastMove = performance.now() - prevT;
+    const flickVel = sinceLastMove > 80 ? 0 : velocity;
+    if (flickVel > FLICK_VELOCITY) {
+      goHome();
+      return;
+    }
+
+    const onRecentIcon = activeIndex === RECENT_INDEX;
+
+    if (revealed && (onRecentIcon || crossedMiddle)) {
+      // Keep the recent apps view open
+      latchRecents();
+    } else if (revealed) {
+      openActive();
+      collapseDock();
+    } else {
+      collapseDock();
+    }
+  };
+
+  frame.addEventListener('pointermove', onMove);
+  frame.addEventListener('pointerup', onUp);
+});
+
+function collapseDock() {
+  dock.classList.remove('revealed');
+  if (!recentsLatched) hideRecentsView();
+}
+
+function goHome() {
+  recentsLatched = false;
+  currentApp = null;
+  appScreen.classList.remove('open');
+  hideRecentsView();
+  dock.classList.remove('revealed');
+}
+
+function latchRecents() {
+  recentsLatched = true;
+  dock.classList.add('revealed'); // dock stays persistent on recents
+  showRecentsView();
+}
+
+function unlatchRecents() {
+  recentsLatched = false;
+  hideRecentsView();
+  dock.classList.remove('revealed');
+}
+
+function openActive() {
+  const app = dockIcons[activeIndex].dataset.app;
+  if (app === 'recent') return; // handled by latchRecents
+  openApp(APP_COLORS[app]);
+}
+
+function openApp(key) {
+  currentApp = key;
+  // Move to the front of the recents stack (most recent)
+  recents = recents.filter(c => c !== key);
+  recents.unshift(key);
+  appScreen.style.background = appBg(key);
+  appScreen.classList.add('open');
+}
+
+// Recents carousel interactions:
+//   • horizontal swipe → page (with fling momentum)
+//   • tap a card        → open that app
+//   • swipe a card UP   → close it (remove from recents)
+//   • swipe a card DOWN → open that app
+// Mode is locked from the first ~10px of motion.
+const FLING_MOMENTUM_MS = 320;     // how far the finger's last velocity carries
+const VERT_OPEN_PX  = 80;          // swipe-down distance to open
+const VERT_CLOSE_PX = 80;          // swipe-up distance to close
+const MODE_LOCK_PX  = 10;          // movement before we commit to horiz/vert
+let rDragging = false, rStartX = 0, rStartY = 0, rBaseOffset = 0;
+let rStartTarget = null, rCard = null, rMode = null; // null | 'horiz' | 'vert'
+let rPrevX = 0, rPrevT = 0, rVel = 0;
+
+recentsPreview.addEventListener('pointerdown', (e) => {
+  if (!recentsLatched) return;
+  // Only engage the carousel if the press started on an actual card —
+  // presses in the dim margin around cards fall through to the frame-level
+  // dismiss handler (and return you to whatever's behind).
+  if (!e.target.closest('.preview-card')) return;
+  rDragging = true;
+  rMode = null;
+  rStartX = e.clientX;
+  rStartY = e.clientY;
+  rStartTarget = e.target; // captured here — pointer capture retargets later events
+  rCard = e.target.closest('.preview-card');
+  rBaseOffset = offsetForIndex(recentsIndex);
+  rPrevX = e.clientX;
+  rPrevT = performance.now();
+  rVel = 0;
+  recentsPreview.setPointerCapture(e.pointerId);
+});
+
+recentsPreview.addEventListener('pointermove', (e) => {
+  if (!rDragging) return;
+  const dx = e.clientX - rStartX;
+  const dy = e.clientY - rStartY;
+
+  // Lock the gesture mode on first decisive motion
+  if (!rMode && (Math.abs(dx) > MODE_LOCK_PX || Math.abs(dy) > MODE_LOCK_PX)) {
+    // Vertical only counts if the user pressed on a real card
+    rMode = (Math.abs(dy) > Math.abs(dx) && rCard) ? 'vert' : 'horiz';
+  }
+
+  if (rMode === 'horiz') {
+    // Track instantaneous horizontal velocity (px/ms)
+    const now = performance.now();
+    const dt = now - rPrevT;
+    if (dt > 0) {
+      rVel = (e.clientX - rPrevX) / dt;
+      rPrevT = now;
+      rPrevX = e.clientX;
+    }
+    setRecentsOffset(rBaseOffset + dx, false);
+  } else if (rMode === 'vert' && rCard) {
+    // Drag the single card vertically, fading slightly as it travels
+    rCard.style.transform = `translateY(${dy}px)`;
+    rCard.style.opacity = String(Math.max(0.4, 1 - Math.abs(dy) / 400));
+  }
+});
+
+recentsPreview.addEventListener('pointerup', (e) => {
+  if (!rDragging) return;
+  rDragging = false;
+  const dx = e.clientX - rStartX;
+  const dy = e.clientY - rStartY;
+
+  // No mode locked → it was a tap
+  if (!rMode) {
+    const card = rStartTarget && rStartTarget.closest('.preview-card');
+    if (card) {
+      unlatchRecents();
+      openApp(card.dataset.appKey);
+    }
+    return;
+  }
+
+  if (rMode === 'horiz') {
+    // Project finger displacement + a window of the last velocity (fling).
+    // Ignore stale velocity if the finger paused before releasing.
+    const sinceLast = performance.now() - rPrevT;
+    const v = sinceLast > 80 ? 0 : rVel;
+    const projected = dx + v * FLING_MOMENTUM_MS;
+    let delta = Math.round(-projected / CARD_STEP);
+    if (delta === 0 && Math.abs(dx) > CARD_STEP * 0.22) delta = dx < 0 ? 1 : -1;
+    recentsIndex = Math.max(0, Math.min(recentsCards.length - 1, recentsIndex + delta));
+    setRecentsOffset(offsetForIndex(recentsIndex), true);
+    return;
+  }
+
+  // rMode === 'vert'
+  if (!rCard) return;
+  const key = rCard.dataset.appKey;
+
+  if (dy > VERT_OPEN_PX) {
+    // Swipe DOWN → open
+    rCard.style.transform = '';
+    rCard.style.opacity = '';
+    unlatchRecents();
+    openApp(key);
+  } else if (dy < -VERT_CLOSE_PX) {
+    // Swipe UP → close: animate the card off-screen, then rebuild recents
+    rCard.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+    rCard.style.transform = 'translateY(-460px)';
+    rCard.style.opacity = '0';
+    setTimeout(() => {
+      recents = recents.filter(c => c !== key);
+      if (key === currentApp) currentApp = null;
+      buildRecentsPreview(true);
+    }, 220);
+  } else {
+    // Not far enough → snap back
+    rCard.style.transition = 'transform 0.18s ease, opacity 0.18s ease';
+    rCard.style.transform = '';
+    rCard.style.opacity = '';
+    setTimeout(() => { if (rCard) rCard.style.transition = ''; }, 180);
+  }
+});
+
+// Tap anywhere that isn't a card / dock / edge zone (while latched) →
+// dismiss recents back to whatever is behind (home or the running app).
+frame.addEventListener('pointerdown', (e) => {
+  if (!recentsLatched || dragging) return;
+  if (e.target.closest('.preview-card')) return;   // card tap = open / handled by carousel
+  if (e.target.closest('#dock')) return;           // dock is persistent
+  if (e.target.closest('#deadzone')) return;       // deadzone is part of the gesture surface
+  if (e.target.closest('#swipe-zone')) return;     // swipe zone starts a new gesture
+  unlatchRecents();
+});
+
+// Stage 2 gesture: while the recents view is latched, press+drag inside the
+// dock sizes up the icon under the finger (same metaphor as the initial
+// swipe-up). Releasing opens the active app; releasing on the centre/recent
+// slot keeps the recents view open. A simple tap is just the zero-move case.
+dock.addEventListener('pointerdown', (e) => {
+  if (!recentsLatched) return;
+  e.stopPropagation();
+  setActive(nearestIconIndex(e.clientX));
+  frame.setPointerCapture(e.pointerId);
+  const onMove = (ev) => setActive(nearestIconIndex(ev.clientX));
+  const onUp = () => {
+    frame.removeEventListener('pointermove', onMove);
+    frame.removeEventListener('pointerup', onUp);
+    const app = dockIcons[activeIndex].dataset.app;
+    if (app === 'recent') return; // released on the centre slot — stay on recents
+    unlatchRecents();
+    openApp(APP_COLORS[app]);
+  };
+  frame.addEventListener('pointermove', onMove);
+  frame.addEventListener('pointerup', onUp);
+});
+
+// Corner toggles (top-right: dock fill, top-left: bottom-edge visibility)
+function wireToggle(id, cls, labelOn, labelOff, startOn) {
+  const el = document.getElementById(id);
+  if (startOn) frame.classList.add(cls);
+  el.textContent = startOn ? labelOn : labelOff;
+  el.addEventListener('pointerdown', (e) => {
+    e.stopPropagation(); // don't trigger frame-level dismiss/hit handlers
+    const on = frame.classList.toggle(cls);
+    el.textContent = on ? labelOn : labelOff;
+  });
+}
+wireToggle('dock-fill-toggle', 'dock-bare',  'Dock BG: OFF', 'Dock BG: ON',  true);
+wireToggle('edge-toggle',      'show-edges', 'Edges: ON',    'Edges: OFF',   false);
+
+buildRecentsPreview();
+</script>
+
+</body>
+</html>
