@@ -83,20 +83,25 @@
     justify-content: center;
     overflow: visible;
     opacity: 0;
-    transform: scale(0.92);
+    transform: translateY(26px);
     pointer-events: none;
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22,1,0.36,1);
   }
   #recents-preview.visible {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
     pointer-events: auto;
   }
-  /* Used during minimize: cards sit at final scale (only opacity fades in),
-     so the app zooms cleanly onto the centred card with no scale mismatch */
+  /* slide up & out of the way when a drawer / fan takes over */
+  #recents-preview.exit-up {
+    opacity: 0;
+    transform: translateY(-120px);
+    pointer-events: none;
+  }
+  /* during minimize: hold at final position, fade opacity only */
   #recents-preview.no-scale,
   #recents-preview.no-scale.visible {
-    transform: scale(1);
+    transform: translateY(0);
     transition: opacity 0.3s ease;
   }
   #recents-track {
@@ -121,7 +126,7 @@
     overflow: hidden;
     transform: translateY(100%);
     pointer-events: none;
-    transition: transform 0.32s cubic-bezier(0.22,1,0.36,1);
+    transition: transform 0.24s cubic-bezier(0.22,1,0.36,1);
   }
   #panels.open {
     transform: translateY(0);
@@ -502,12 +507,34 @@ function setRecentsOffset(px, animate) {
 }
 
 function showRecentsView() {
+  recentsPreview.classList.remove('exit-up');
   recentsPreview.classList.add('visible');
   recentsBg.classList.add('visible');
 }
 function hideRecentsView() {
-  recentsPreview.classList.remove('visible');
+  recentsPreview.classList.remove('visible', 'exit-up');
   if (!panelsLatched) recentsBg.classList.remove('visible');
+}
+// Live during the drag: recents in place ('in') or sliding up & out ('up')
+function slideRecents(state) {
+  if (state === 'in') {
+    recentsPreview.classList.remove('exit-up');
+    recentsPreview.classList.add('visible');
+    recentsBg.classList.add('visible');
+  } else {
+    recentsPreview.classList.remove('visible');
+    recentsPreview.classList.add('exit-up');
+  }
+}
+// Live drawer preview — slides up from behind the dock
+function showDrawer(which) {
+  setPanelIndex(which === 'qs' ? 1 : 0);
+  panels.classList.add('open');
+  recentsBg.classList.add('visible');
+}
+function hideDrawer() {
+  if (panelsLatched) return;
+  panels.classList.remove('open');
 }
 
 /* ---------- favourites fan-out ---------- */
@@ -540,14 +567,6 @@ function setPanelIndex(i) {
   panelIndex = Math.max(0, Math.min(1, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
   panelDots.forEach((d, k) => d.classList.toggle('on', k === panelIndex));
-}
-function showPanels(which) {
-  panelsLatched = true;
-  setPanelIndex(which === 'qs' ? 1 : 0);
-  panels.classList.add('open');
-  recentsBg.classList.add('visible');
-  dock.classList.add('revealed');
-  hideRecentsView();
 }
 function hidePanels() {
   panelsLatched = false;
@@ -608,16 +627,32 @@ const FLICK_VELOCITY = 0.9;
 function activeApp() { return dockIcons[activeIndex].dataset.app; }
 
 function setActive(index) {
-  if (index !== activeIndex) {
-    dockIcons[activeIndex].classList.remove('active');
-    dockIcons[index].classList.add('active');
-    activeIndex = index;
-  }
+  if (index === activeIndex) return;
+  dockIcons[activeIndex].classList.remove('active');
+  dockIcons[index].classList.add('active');
+  activeIndex = index;
+  updateOverview();
+}
+
+// Show the right surface live for the active slot during the drag:
+//   running        → recents slide into place
+//   favourites     → recents slide up, fan opens
+//   notifications  → recents slide up, notif drawer slides up from behind dock
+//   quicksettings  → recents slide up, qs drawer slides up
+//   search         → recents slide up, nothing else
+function updateOverview() {
+  if (!dock.classList.contains('revealed')) return;
   const app = activeApp();
-  // Live preview while the dock is up: recents on running, fan on favourites
-  if (dock.classList.contains('revealed')) {
-    if (app === 'running') showRecentsView(); else if (!recentsLatched) hideRecentsView();
-    if (app !== 'favourites') closeFan();
+  if (app === 'running') {
+    hideDrawer(); closeFan(); slideRecents('in');
+  } else if (app === 'favourites') {
+    hideDrawer(); slideRecents('up'); favFan.classList.add('open');
+  } else if (app === 'notifications') {
+    closeFan(); slideRecents('up'); showDrawer('notif');
+  } else if (app === 'quicksettings') {
+    closeFan(); slideRecents('up'); showDrawer('qs');
+  } else {
+    closeFan(); hideDrawer(); slideRecents('up');
   }
 }
 
@@ -690,7 +725,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (dy > 8 && !revealed) {
       revealed = true;
       dock.classList.add('revealed');
-      showRecentsView();
+      updateOverview();           // show the surface for the current (centre) slot
     }
     if (!revealed) return;
     updateActiveAndFan(e2.clientX, e2.clientY);
@@ -728,24 +763,35 @@ function routeRelease() {
     } else {
       collapseAll();
     }
-  } else if (app === 'notifications') {
-    dock.classList.remove('revealed'); // showPanels re-adds; keeps things tidy
-    showPanels('notif');
-  } else if (app === 'quicksettings') {
-    showPanels('qs');
+  } else if (app === 'notifications' || app === 'quicksettings') {
+    commitDrawer(app === 'quicksettings' ? 'qs' : 'notif');
   } else {
     collapseAll(); // search = stub for now
   }
 }
 
-function collapseDock() { dock.classList.remove('revealed'); }
+// The drawer is already shown live by the drag — just lock it open on release.
+function commitDrawer(which) {
+  panelsLatched = true;
+  recentsLatched = false;
+  setPanelIndex(which === 'qs' ? 1 : 0);
+  panels.classList.add('open');
+  recentsBg.classList.add('visible');
+  dock.classList.add('revealed');
+  closeFan();
+  recentsPreview.classList.remove('visible'); // recents stays slid up
+}
+
 function collapseAll() {
   dock.classList.remove('revealed');
   closeFan();
-  if (!recentsLatched) hideRecentsView();
+  hideDrawer();
+  hideRecentsView();
 }
 function latchRecents() {
   recentsLatched = true;
+  panelsLatched = false;
+  panels.classList.remove('open');
   dock.classList.add('revealed');
   showRecentsView();
   closeFan();
@@ -884,6 +930,10 @@ dock.addEventListener('pointerdown', (e) => {
   if (!recentsLatched && !panelsLatched) return;
   e.stopPropagation();
   gestureFrameRect = frame.getBoundingClientRect();
+  // Re-selecting: drop the committed state so the drag can preview other
+  // slots live, but keep whatever's currently shown until the finger moves.
+  recentsLatched = false;
+  panelsLatched = false;
   setActive(nearestIconIndex(e.clientX));
   frame.setPointerCapture(e.pointerId);
 
@@ -891,10 +941,6 @@ dock.addEventListener('pointerdown', (e) => {
   const onUp = () => {
     frame.removeEventListener('pointermove', onMove);
     frame.removeEventListener('pointerup', onUp);
-    // leaving the previous overview, route to the tapped slot
-    recentsLatched = false;
-    panelsLatched = false;
-    panels.classList.remove('open');
     routeRelease();
   };
   frame.addEventListener('pointermove', onMove);
