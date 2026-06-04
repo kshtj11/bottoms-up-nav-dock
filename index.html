@@ -64,6 +64,12 @@
     opacity: 1;
     pointer-events: auto;
   }
+  /* During minimize the app lifts above the overview and zooms into its card */
+  #app-screen.minimizing {
+    z-index: 15;
+    transition: transform 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
 
   /* Recent apps overview */
   #recents-preview {
@@ -85,6 +91,13 @@
     opacity: 1;
     transform: scale(1);
     pointer-events: auto;
+  }
+  /* Used during minimize: cards sit at final scale (only opacity fades in),
+     so the app zooms cleanly onto the centred card with no scale mismatch */
+  #recents-preview.no-scale,
+  #recents-preview.no-scale.visible {
+    transform: scale(1);
+    transition: opacity 0.3s ease;
   }
   #recents-track {
     display: flex;
@@ -126,8 +139,7 @@
     width: 540px;
     height: 620px;
     flex: none;
-    background: #535353;
-    background: color(display-p3 0.325 0.325 0.325);
+    /* transparent — only the inner cells show, over the dimmed home */
   }
   /* drawer cells (quick-settings tiles & notification cards) */
   .cell {
@@ -552,28 +564,35 @@ function openApp(key) {
   appScreen.classList.add('open');
 }
 
-/* Minimize the open app down into its recents card (scroll-up while in app) */
+/* Minimize the open app: zoom it down onto its recents card (scroll-up in app).
+   The app lifts above the overview and scales to the exact centred-card rect
+   (left 108, top 113, 324x372 = scale 0.6 from the top-left), so when it's
+   removed the identical card is revealed underneath with no jump. */
 function minimizeAppIntoRecents() {
   recentsLatched = true;
   dock.classList.add('revealed');
-  currentApp = null;          // the app now appears as the centred recents card
+  currentApp = null;                       // the app becomes the centred card
   buildRecentsPreview();
+  recentsPreview.classList.add('no-scale'); // cards at final scale, fade opacity only
   showRecentsView();
 
-  appScreen.style.transition = 'transform 0.3s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease';
+  appScreen.classList.add('minimizing');    // z-index above overview + transform transition
   appScreen.style.transformOrigin = 'top left';
-  // shrink to the centred 324x372 card at top:113, left:108
+  void appScreen.offsetWidth;               // commit the full-size start state
   appScreen.style.transform = 'translate(108px, 113px) scale(0.6)';
-  appScreen.style.opacity = '0';
+
+  let finished = false;
   const done = () => {
+    if (finished) return;
+    finished = true;
     appScreen.removeEventListener('transitionend', done);
-    appScreen.classList.remove('open');
-    appScreen.style.transition = '';
+    appScreen.classList.remove('open', 'minimizing');
     appScreen.style.transform = '';
     appScreen.style.transformOrigin = '';
-    appScreen.style.opacity = '';
+    recentsPreview.classList.remove('no-scale');
   };
   appScreen.addEventListener('transitionend', done);
+  setTimeout(done, 420); // fallback if transitionend doesn't fire
 }
 
 /* ---------- global states ---------- */
