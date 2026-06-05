@@ -50,6 +50,8 @@
     opacity: 0.75;
     pointer-events: auto;
   }
+  /* lighter dim for the notif/settings peek so the app behind keeps context */
+  #recents-bg.light.visible { opacity: 0.4; }
 
   /* Full-screen opened app */
   #app-screen {
@@ -750,17 +752,28 @@ function closeFan() {
 
 /* ---------- notifications / quick-settings panels ---------- */
 let panelsLatched = false;
-let panelIndex = 0; // 0 = notifications, 1 = quick settings
+let panelIndex = 0;     // 0 = notifications (left), 1 = settings (right)
+let lastPanelIndex = 0; // remembers which one to reopen on the next peek
 
 function setPanelIndex(i) {
   panelIndex = Math.max(0, Math.min(1, i));
+  lastPanelIndex = panelIndex;
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
   panelDots.forEach((d, k) => d.classList.toggle('on', k === panelIndex));
 }
 function hidePanels() {
   panelsLatched = false;
   panels.classList.remove('open');
+  recentsBg.classList.remove('light');
   if (!recentsLatched) recentsBg.classList.remove('visible');
+}
+// Quick peek: notif/settings slide up over the app/home, no dock, no minimize.
+function startPeek() {
+  panelsLatched = true;
+  recentsLatched = false;
+  setPanelIndex(lastPanelIndex);          // reopen the last-viewed one
+  panels.classList.add('open');
+  recentsBg.classList.add('visible', 'light');
 }
 
 /* ---------- foreground app ---------- */
@@ -914,7 +927,9 @@ swipeZone.addEventListener('pointerdown', (e) => {
   if (searchLatched) { searchLatched = false; hideSearch(); }
 
   const startX = e.clientX, startY0 = e.clientY;
-  let mode = null;                 // null | 'reveal' | 'switch'
+  const szRect = swipeZone.getBoundingClientRect();
+  const rightSide = e.clientX > szRect.left + szRect.width * 0.5; // peek half
+  let mode = null;                 // null | 'reveal' | 'switch' | 'peek'
   dragging = true;
   revealed = false;
   recentsLatched = false;
@@ -938,11 +953,16 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (!mode) {
       const up = startY0 - e2.clientY;            // up = the primary gesture
       if (up > 8) {
-        mode = 'reveal';
-        revealed = true;
-        dock.classList.add('revealed');
-        if (currentApp) startMinimize(); else buildRecentsPreview();
-        updateOverview();
+        if (rightSide) {
+          mode = 'peek';                          // right-side up = notif/settings peek
+          startPeek();
+        } else {
+          mode = 'reveal';
+          revealed = true;
+          dock.classList.add('revealed');
+          if (currentApp) startMinimize(); else buildRecentsPreview();
+          updateOverview();
+        }
       } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
         // app-switch is secondary: needs a long, near-flat sideways drag
         mode = 'switch';
@@ -1043,7 +1063,7 @@ function goHome() {
   appScreen.style.transformOrigin = '';
   recentsPreview.classList.remove('no-scale');
   collapseAll();                       // dock + fan + drawer + search + recents
-  recentsBg.classList.remove('visible');
+  recentsBg.classList.remove('visible', 'light');
 }
 
 /* ===================== recents carousel interactions ===================== */
