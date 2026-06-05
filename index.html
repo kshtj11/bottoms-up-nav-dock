@@ -272,6 +272,109 @@
   }
   .fav-tile.sel { transform: scale(1.28) translateY(-6px); }
 
+  /* ===================== Search (bar + keyboard + results) ===================== */
+  #search-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 25;            /* above the dock, below the edge/toggles */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.24s ease;
+  }
+  #search-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* results fill the area above the search bar */
+  #search-results {
+    position: absolute;
+    left: 0; top: 64px;
+    width: 540px; bottom: 300px;
+    padding: 0 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    opacity: 0;
+    transition: opacity 0.2s ease 0.06s;
+  }
+  #search-overlay.open #search-results { opacity: 1; }
+  .sr-row {
+    height: 64px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.10);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 16px;
+    flex: none;
+  }
+  .sr-ico { width: 40px; height: 40px; border-radius: 11px; background: rgba(255,255,255,0.18); flex: none; }
+  .sr-lines { display: flex; flex-direction: column; gap: 8px; }
+  .sr-line { height: 11px; border-radius: 6px; background: rgba(255,255,255,0.20); }
+
+  /* search bar — starts at the icon size, expands horizontally */
+  #search-bar {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 246px;          /* sits just above the keyboard */
+    width: 64px;            /* collapsed = dock icon size */
+    height: 48px;
+    background: #2A2A2A;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 18px;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: width 0.3s cubic-bezier(0.22,1,0.36,1);
+  }
+  #search-overlay.open #search-bar { width: 500px; }
+  #search-bar svg { width: 22px; height: 22px; flex: none; }
+  #search-bar .sb-text { font-family: 'Inter', sans-serif; font-size: 18px; color: #8A8A8A; }
+
+  /* QWERTY keyboard — slides up from the bottom (visual only) */
+  #keyboard {
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 540px; height: 230px;
+    background: #000000;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
+  }
+  #search-overlay.open #keyboard { transform: translateY(0); }
+  .kb-row {
+    position: absolute;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    height: 56px;
+  }
+  .kb-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 56px;
+    width: 50px;
+  }
+  .kb-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 48px;
+    background: #3A3A3A;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 28px;
+    color: #DDDDDD;
+  }
+
   /* ===================== Bottom edge / swipe zone ===================== */
   #deadzone {
     position: absolute;
@@ -427,6 +530,22 @@
     </div>
   </div>
 
+  <!-- Search overlay: results + expanding bar + keyboard -->
+  <div id="search-overlay">
+    <div id="search-results">
+      <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:180px"></div><div class="sr-line" style="width:110px"></div></div></div>
+      <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:140px"></div><div class="sr-line" style="width:90px"></div></div></div>
+      <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:200px"></div><div class="sr-line" style="width:130px"></div></div></div>
+    </div>
+    <div id="search-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/>
+      </svg>
+      <span class="sb-text">Search apps, settings, web</span>
+    </div>
+    <div id="keyboard"></div>
+  </div>
+
   <!-- Favourites fan-out (4 apps) -->
   <div id="fav-fan"></div>
 
@@ -452,6 +571,65 @@ const favFan       = document.getElementById('fav-fan');
 const panels       = document.getElementById('panels');
 const panelsTrack  = document.getElementById('panels-track');
 const panelDots    = Array.from(document.querySelectorAll('.pdot'));
+const searchOverlay = document.getElementById('search-overlay');
+
+/* ---------- keyboard (visual only, built once) ---------- */
+const KB_ROWS = [
+  { top: 3,   left: 20, width: 500, keys: 'qwertyuiop'.split('').map(c => ({ c })) },
+  { top: 59,  left: 45, width: 450, keys: 'asdfghjkl'.split('').map(c => ({ c })) },
+  { top: 115, left: 5,  width: 528, keys: [
+      { c: '⇧', cw: 90, kw: 82, bg: '#636363', fs: 24 },
+      ...'zxcvbnm'.split('').map(c => ({ c })),
+      { c: '⌫', cw: 88, kw: 80, bg: '#474747', fs: 22 },
+  ]},
+  { top: 171, left: 5,  width: 530, keys: [
+      { c: '?123', cw: 72,  kw: 64,  kh: 44, fs: 18 },
+      { c: ',',    cw: 50,  kw: 42,  kh: 44, fs: 22 },
+      { c: '',     cw: 276, kw: 268, kh: 44, bg: '#474747' },
+      { c: '.',    cw: 52,  kw: 42,  kh: 44, fs: 22 },
+      { c: 'done', cw: 80,  kw: 68,  kh: 44, fs: 18, bg: '#636363' },
+  ]},
+];
+(function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  KB_ROWS.forEach(row => {
+    const r = document.createElement('div');
+    r.className = 'kb-row';
+    r.style.top = row.top + 'px';
+    r.style.left = row.left + 'px';
+    r.style.width = row.width + 'px';
+    row.keys.forEach(k => {
+      const cell = document.createElement('div');
+      cell.className = 'kb-cell';
+      if (k.cw) cell.style.width = k.cw + 'px';
+      const key = document.createElement('div');
+      key.className = 'kb-key';
+      key.textContent = k.c;
+      if (k.kw) key.style.width = k.kw + 'px';
+      if (k.kh) key.style.height = k.kh + 'px';
+      if (k.bg) key.style.background = k.bg;
+      if (k.fs) key.style.fontSize = k.fs + 'px';
+      cell.appendChild(key);
+      r.appendChild(cell);
+    });
+    kb.appendChild(r);
+  });
+})();
+
+let searchLatched = false;
+function showSearch() {           // live preview during the drag
+  searchOverlay.classList.add('open');
+  recentsBg.classList.add('visible');
+}
+function hideSearch() {
+  searchOverlay.classList.remove('open');
+}
+function commitSearch() {         // lock open on release
+  searchLatched = true;
+  searchOverlay.classList.add('open');
+  recentsBg.classList.add('visible');
+  closeFan();
+}
 
 const FRAME_H   = 620;
 const DOCK_TOP  = FRAME_H - 26 - 73;   // y of the dock's top within the frame = 521
@@ -642,6 +820,7 @@ function updateOverview() {
   if (!dock.classList.contains('revealed')) return;
   recentsBg.classList.add('visible'); // dim always sits over the home/app behind
   const app = activeApp();
+  if (app !== 'search') hideSearch();
   if (app === 'running') {
     hideDrawer(); closeFan(); slideRecents('in');
   } else if (app === 'favourites') {
@@ -650,8 +829,8 @@ function updateOverview() {
     closeFan(); slideRecents('up'); showDrawer('notif');
   } else if (app === 'quicksettings') {
     closeFan(); slideRecents('up'); showDrawer('qs');
-  } else {
-    closeFan(); hideDrawer(); slideRecents('up');
+  } else { // search
+    closeFan(); hideDrawer(); slideRecents('up'); showSearch();
   }
 }
 
@@ -697,6 +876,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
   // dismiss any open overview first
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
+  if (searchLatched) { searchLatched = false; hideSearch(); }
 
   dragging = true;
   revealed = false;
@@ -765,8 +945,9 @@ function routeRelease() {
     }
   } else if (app === 'notifications' || app === 'quicksettings') {
     commitDrawer(app === 'quicksettings' ? 'qs' : 'notif');
-  } else {
-    collapseAll(); // search = stub for now
+  } else { // search
+    dock.classList.remove('revealed'); // keyboard covers the dock in search mode
+    commitSearch();
   }
 }
 
@@ -786,6 +967,7 @@ function collapseAll() {
   dock.classList.remove('revealed');
   closeFan();
   hideDrawer();
+  hideSearch();
   hideRecentsView();
 }
 function latchRecents() {
@@ -804,6 +986,8 @@ function unlatchRecents() {
 function goHome() {
   recentsLatched = false;
   panelsLatched = false;
+  searchLatched = false;
+  hideSearch();
   currentApp = null;
   appScreen.classList.remove('open', 'minimizing');
   appScreen.style.transform = '';
@@ -961,6 +1145,31 @@ frame.addEventListener('pointerdown', (e) => {
   if (e.target.closest('#swipe-zone')) return;
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
+});
+
+/* ===================== search: swipe down to dismiss ===================== */
+let sDragging = false, sStartY = 0;
+searchOverlay.addEventListener('pointerdown', (e) => {
+  if (!searchLatched) return;
+  sDragging = true;
+  sStartY = e.clientY;
+  searchOverlay.setPointerCapture(e.pointerId);
+});
+searchOverlay.addEventListener('pointermove', (e) => {
+  if (!sDragging) return;
+  const dy = e.clientY - sStartY;
+  if (dy > 0) {
+    searchOverlay.style.transition = 'none';
+    searchOverlay.style.transform = `translateY(${dy}px)`;
+  }
+});
+searchOverlay.addEventListener('pointerup', (e) => {
+  if (!sDragging) return;
+  sDragging = false;
+  const dy = e.clientY - sStartY;
+  searchOverlay.style.transition = '';
+  searchOverlay.style.transform = '';
+  if (dy > 90) { searchLatched = false; hideSearch(); recentsBg.classList.remove('visible'); }
 });
 
 /* ===================== corner toggles ===================== */
