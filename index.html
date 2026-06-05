@@ -71,6 +71,20 @@
     will-change: transform;
   }
 
+  /* Horizontal app-switcher: running apps in a row over the home, 40px gaps */
+  #app-strip {
+    position: absolute;
+    top: 0; left: 0;
+    height: 620px;
+    display: flex;
+    gap: 40px;
+    z-index: 6;            /* over home, under the dim/overview */
+    pointer-events: none;
+    will-change: transform;
+  }
+  #app-strip:not(.active) { display: none; }
+  .app-panel { width: 540px; height: 620px; flex: none; }
+
   /* Recent apps overview */
   #recents-preview {
     position: absolute;
@@ -436,6 +450,8 @@
 
   <!-- Opened app -->
   <div id="app-screen"></div>
+  <!-- Horizontal app-switcher strip (swipe left/right on the bottom edge) -->
+  <div id="app-strip"></div>
 
   <!-- Dim layer -->
   <div id="recents-bg"></div>
@@ -565,6 +581,7 @@ const swipeZone    = document.getElementById('swipe-zone');
 const dock         = document.getElementById('dock');
 const dockIcons    = Array.from(document.querySelectorAll('.dock-icon'));
 const appScreen    = document.getElementById('app-screen');
+const appStrip     = document.getElementById('app-strip');
 const recentsPreview = document.getElementById('recents-preview');
 const recentsTrack = document.getElementById('recents-track');
 const recentsBg    = document.getElementById('recents-bg');
@@ -758,6 +775,43 @@ function openApp(key) {
   appScreen.classList.add('open');
 }
 
+/* ---------- horizontal app-switcher (swipe along the bottom edge) ---------- */
+const PANEL_STEP = 540 + 40;          // panel width + gap
+let switchApps = [], switchIndex = 0;
+
+function startSwitch() {
+  switchApps = recents.slice();       // running apps, stable order for the gesture
+  switchIndex = Math.max(0, switchApps.indexOf(currentApp));
+  appStrip.innerHTML = '';
+  switchApps.forEach(key => {
+    const p = document.createElement('div');
+    p.className = 'app-panel';
+    p.style.background = appBg(key);
+    appStrip.appendChild(p);
+  });
+  appStrip.classList.add('active');
+  appScreen.classList.remove('open'); // strip stands in for the single app screen
+  setSwitchOffset(0, false);
+}
+function setSwitchOffset(dx, animate) {
+  appStrip.style.transition = animate ? 'transform 0.24s cubic-bezier(0.22,1,0.36,1)' : 'none';
+  appStrip.style.transform = `translateX(${-switchIndex * PANEL_STEP + dx}px)`;
+}
+function endSwitch(dx, v) {
+  const projected = dx + v * 180;     // momentum → quick snap
+  let delta = Math.round(-projected / PANEL_STEP);
+  if (delta === 0 && Math.abs(dx) > PANEL_STEP * 0.16) delta = dx < 0 ? 1 : -1;
+  switchIndex = Math.max(0, Math.min(switchApps.length - 1, switchIndex + delta));
+  setSwitchOffset(0, true);
+  const key = switchApps[switchIndex];
+  setTimeout(() => {                   // after the snap, hand back to the single app screen
+    currentApp = key;
+    appScreen.style.background = appBg(key);
+    appScreen.classList.add('open');
+    appStrip.classList.remove('active');
+  }, 240);
+}
+
 /* Begin minimizing the open app the instant the swipe reveals the overview.
    The app lifts above the dim + recents (z15) and zooms into its centred card
    rect (left 108, top 113, 324x372 = scale 0.6 from top-left). As it shrinks
@@ -854,7 +908,7 @@ function nearestByX(els, px) {
 const nearestIconIndex = (px) => nearestByX(dockIcons, px);
 const nearestFavIndex  = (px) => nearestByX(favTiles, px);
 
-/* ---------- primary swipe-up gesture ---------- */
+/* ---------- bottom-edge gesture: swipe UP = overview, swipe L/R = app-switch ---------- */
 swipeZone.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   // dismiss any open overview first
@@ -862,6 +916,8 @@ swipeZone.addEventListener('pointerdown', (e) => {
   if (panelsLatched) hidePanels();
   if (searchLatched) { searchLatched = false; hideSearch(); }
 
+  const startX = e.clientX, startY0 = e.clientY;
+  let mode = null;                 // null | 'reveal' | 'switch'
   dragging = true;
   revealed = false;
   recentsLatched = false;
@@ -869,45 +925,60 @@ swipeZone.addEventListener('pointerdown', (e) => {
   prevY = e.clientY;
   prevT = performance.now();
   velocity = 0;
+  let hPrevX = e.clientX, hPrevT = performance.now(), hVel = 0;
   gestureFrameRect = frame.getBoundingClientRect();
 
   dockIcons.forEach(ic => ic.classList.remove('active'));
   activeIndex = RUNNING_INDEX;
   dockIcons[RUNNING_INDEX].classList.add('active');
-
-  buildRecentsPreview();
   frame.setPointerCapture(e.pointerId);
 
   const onMove = (e2) => {
     if (!dragging) return;
-    const now = performance.now();
-    const dt = now - prevT;
-    if (dt > 0) { velocity = (prevY - e2.clientY) / dt; prevT = now; prevY = e2.clientY; }
+    const adx = Math.abs(e2.clientX - startX);
+    const ady = Math.abs(e2.clientY - startY0);
 
-    const dy = startY - e2.clientY;
-    if (dy > 8 && !revealed) {
-      revealed = true;
-      dock.classList.add('revealed');
-      if (currentApp) startMinimize(); // app zooms into its card; dimmed home stays behind
-      updateOverview();                // show the surface for the current (centre) slot
+    if (!mode) {
+      if (currentApp && recents.length >= 2 && adx > 12 && adx > ady) {
+        mode = 'switch';
+        startSwitch();
+      } else if (e2.clientY < startY0 - 8) {
+        mode = 'reveal';
+        revealed = true;
+        dock.classList.add('revealed');
+        if (currentApp) startMinimize(); else buildRecentsPreview();
+        updateOverview();
+      }
     }
-    if (!revealed) return;
-    updateActiveAndFan(e2.clientX, e2.clientY);
+
+    if (mode === 'reveal') {
+      const now = performance.now(), dt = now - prevT;
+      if (dt > 0) { velocity = (prevY - e2.clientY) / dt; prevT = now; prevY = e2.clientY; }
+      updateActiveAndFan(e2.clientX, e2.clientY);
+    } else if (mode === 'switch') {
+      const now = performance.now(), dt = now - hPrevT;
+      if (dt > 0) { hVel = (e2.clientX - hPrevX) / dt; hPrevT = now; hPrevX = e2.clientX; }
+      setSwitchOffset(e2.clientX - startX, false);
+    }
   };
 
-  const onUp = () => {
+  const onUp = (e2) => {
     frame.removeEventListener('pointermove', onMove);
     frame.removeEventListener('pointerup', onUp);
     dragging = false;
 
-    // Quick flick → home
-    const sinceLast = performance.now() - prevT;
-    const flickVel = sinceLast > 80 ? 0 : velocity;
-    if (flickVel > FLICK_VELOCITY) { goHome(); return; }
-
-    if (!revealed) { collapseAll(); return; }
-
-    routeRelease();
+    if (mode === 'reveal') {
+      const sinceLast = performance.now() - prevT;
+      const flickVel = sinceLast > 80 ? 0 : velocity;
+      if (flickVel > FLICK_VELOCITY) { goHome(); return; }
+      if (!revealed) { collapseAll(); return; }
+      routeRelease();
+    } else if (mode === 'switch') {
+      const sinceLast = performance.now() - hPrevT;
+      const v = sinceLast > 80 ? 0 : hVel;
+      endSwitch(e2.clientX - startX, v);
+    }
+    // mode === null → a tap, nothing to do
   };
 
   frame.addEventListener('pointermove', onMove);
