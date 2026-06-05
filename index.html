@@ -939,15 +939,17 @@ swipeZone.addEventListener('pointerdown', (e) => {
     const ady = Math.abs(e2.clientY - startY0);
 
     if (!mode) {
-      if (currentApp && recents.length >= 2 && adx > 12 && adx > ady) {
-        mode = 'switch';
-        startSwitch();
-      } else if (e2.clientY < startY0 - 8) {
+      const up = startY0 - e2.clientY;            // up = the primary gesture
+      if (up > 8) {
         mode = 'reveal';
         revealed = true;
         dock.classList.add('revealed');
         if (currentApp) startMinimize(); else buildRecentsPreview();
         updateOverview();
+      } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
+        // app-switch is secondary: needs a long, near-flat sideways drag
+        mode = 'switch';
+        startSwitch();
       }
     }
 
