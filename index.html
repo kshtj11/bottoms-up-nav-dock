@@ -244,12 +244,13 @@
   /* ===================== Favourites fan-out ===================== */
   #fav-fan {
     position: absolute;
-    left: 19px;           /* centred over the favourites slot */
-    bottom: 109px;        /* directly above the dock */
-    width: 316px;
+    left: 19px;           /* anchored at the favourites slot, expands rightwards */
+    bottom: 119px;        /* 10px higher */
+    width: 346px;         /* 4 tiles + 1.5x spacing (30px gaps) */
     height: 64px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 30px;
     align-items: center;
     z-index: 21;
     opacity: 0;
