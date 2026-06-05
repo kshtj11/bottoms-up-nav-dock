@@ -695,9 +695,7 @@ function hideRecentsView() {
 // Live during the drag: recents in place ('in') or sliding up & out ('up')
 function slideRecents(state) {
   if (state === 'in') {
-    recentsPreview.classList.remove('exit-up');
-    recentsPreview.classList.add('visible');
-    recentsBg.classList.add('visible');
+    showRecentsView();
   } else {
     recentsPreview.classList.remove('visible');
     recentsPreview.classList.add('exit-up');
@@ -811,28 +809,21 @@ function setActive(index) {
   updateOverview();
 }
 
-// Show the right surface live for the active slot during the drag:
-//   running        → recents slide into place
-//   favourites     → recents slide up, fan opens
-//   notifications  → recents slide up, notif drawer slides up from behind dock
-//   quicksettings  → recents slide up, qs drawer slides up
-//   search         → recents slide up, nothing else
+// Live preview shown for each dock slot during the drag. To add a new nav
+// surface, add one entry here (and one in routeRelease for the commit).
+const SURFACE_PREVIEW = {
+  running:       () => { hideDrawer(); closeFan(); slideRecents('in'); },
+  favourites:    () => { hideDrawer(); slideRecents('up'); favFan.classList.add('open'); },
+  notifications: () => { closeFan(); slideRecents('up'); showDrawer('notif'); },
+  quicksettings: () => { closeFan(); slideRecents('up'); showDrawer('qs'); },
+  search:        () => { closeFan(); hideDrawer(); slideRecents('up'); showSearch(); },
+};
 function updateOverview() {
   if (!dock.classList.contains('revealed')) return;
   recentsBg.classList.add('visible'); // dim always sits over the home/app behind
   const app = activeApp();
   if (app !== 'search') hideSearch();
-  if (app === 'running') {
-    hideDrawer(); closeFan(); slideRecents('in');
-  } else if (app === 'favourites') {
-    hideDrawer(); slideRecents('up'); favFan.classList.add('open');
-  } else if (app === 'notifications') {
-    closeFan(); slideRecents('up'); showDrawer('notif');
-  } else if (app === 'quicksettings') {
-    closeFan(); slideRecents('up'); showDrawer('qs');
-  } else { // search
-    closeFan(); hideDrawer(); slideRecents('up'); showSearch();
-  }
+  (SURFACE_PREVIEW[app] || (() => {}))();
 }
 
 // Pick the active dock slot — but while the finger is up in the open
@@ -850,26 +841,18 @@ function updateActiveAndFan(px, py) {
   }
 }
 
-function nearestIconIndex(px) {
+// Index of the element whose horizontal centre is nearest the pointer X
+function nearestByX(els, px) {
   let best = 0, bd = Infinity;
-  dockIcons.forEach((icon, i) => {
-    const r = icon.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const d = Math.abs(px - cx);
+  els.forEach((el, i) => {
+    const r = el.getBoundingClientRect();
+    const d = Math.abs(px - (r.left + r.width / 2));
     if (d < bd) { bd = d; best = i; }
   });
   return best;
 }
-function nearestFavIndex(px) {
-  let best = 0, bd = Infinity;
-  favTiles.forEach((t, i) => {
-    const r = t.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const d = Math.abs(px - cx);
-    if (d < bd) { bd = d; best = i; }
-  });
-  return best;
-}
+const nearestIconIndex = (px) => nearestByX(dockIcons, px);
+const nearestFavIndex  = (px) => nearestByX(favTiles, px);
 
 /* ---------- primary swipe-up gesture ---------- */
 swipeZone.addEventListener('pointerdown', (e) => {
@@ -954,11 +937,9 @@ function routeRelease() {
 
 // The drawer is already shown live by the drag — just lock it open on release.
 function commitDrawer(which) {
+  showDrawer(which);                          // panel index + open + dim
   panelsLatched = true;
   recentsLatched = false;
-  setPanelIndex(which === 'qs' ? 1 : 0);
-  panels.classList.add('open');
-  recentsBg.classList.add('visible');
   dock.classList.add('revealed');
   closeFan();
   recentsPreview.classList.remove('visible'); // recents stays slid up
@@ -985,20 +966,14 @@ function unlatchRecents() {
   dock.classList.remove('revealed');
 }
 function goHome() {
-  recentsLatched = false;
-  panelsLatched = false;
-  searchLatched = false;
-  hideSearch();
+  recentsLatched = panelsLatched = searchLatched = false;
   currentApp = null;
   appScreen.classList.remove('open', 'minimizing');
   appScreen.style.transform = '';
   appScreen.style.transformOrigin = '';
   recentsPreview.classList.remove('no-scale');
-  panels.classList.remove('open');
-  hideRecentsView();
+  collapseAll();                       // dock + fan + drawer + search + recents
   recentsBg.classList.remove('visible');
-  dock.classList.remove('revealed');
-  closeFan();
 }
 
 /* ===================== recents carousel interactions ===================== */
