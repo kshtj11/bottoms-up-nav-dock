@@ -676,9 +676,10 @@ const CARD_W = 324, CARD_GAP = 44, CARD_STEP = CARD_W + CARD_GAP;
 let recentsCards = [];
 let recentsIndex = 0;
 
-function buildRecentsPreview(animate = false) {
+function buildRecentsPreview(animate = false, withCurrent = false) {
   recentsTrack.innerHTML = '';
-  recentsCards = recents.filter(c => c !== currentApp).reverse(); // rightmost = most recent
+  const list = (withCurrent ? recents : recents.filter(c => c !== currentApp));
+  recentsCards = list.reverse(); // rightmost = most recent
   recentsCards.forEach((key) => {
     const card = document.createElement('div');
     card.className = 'preview-card';
@@ -962,7 +963,9 @@ swipeZone.addEventListener('pointerdown', (e) => {
           mode = 'reveal';
           revealed = true;
           dock.classList.add('revealed');
-          if (currentApp) startMinimize(); else buildRecentsPreview();
+          // App stays open behind the dim during the drag — minimize only fires
+          // if the user commits to recents. Show currentApp as the centred card.
+          buildRecentsPreview(false, !!currentApp);
           updateOverview();
         }
       } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
@@ -1006,7 +1009,8 @@ swipeZone.addEventListener('pointerdown', (e) => {
 function routeRelease() {
   const app = activeApp();
   if (app === 'running') {
-    latchRecents(); // the app (if any) was already minimized when the drag began
+    if (currentApp) startMinimize();  // app zooms into its already-centred card
+    latchRecents();
   } else if (app === 'favourites') {
     if (favSelected >= 0) {
       const fav = FAVOURITES[favSelected];
