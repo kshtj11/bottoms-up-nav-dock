@@ -87,39 +87,23 @@
   #app-strip:not(.active) { display: none; }
   .app-panel { width: 540px; height: 620px; flex: none; }
 
-  /* Recent apps overview */
+  /* Recent apps overview — now nested inside the recents panel of the viewer */
   #recents-preview {
     position: absolute;
     top: 113px;
     left: 0;
     width: 540px;
     height: 372px;
-    z-index: 10;
+    z-index: 1;
     display: flex;
     justify-content: center;
     overflow: visible;
-    opacity: 0;
-    transform: translateY(26px);
-    pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22,1,0.36,1);
-  }
-  #recents-preview.visible {
-    opacity: 1;
-    transform: translateY(0);
     pointer-events: auto;
   }
-  /* slide up & out of the way when a drawer / fan takes over */
-  #recents-preview.exit-up {
-    opacity: 0;
-    transform: translateY(-120px);
-    pointer-events: none;
-  }
-  /* during minimize: hold at final position, fade opacity only */
-  #recents-preview.no-scale,
-  #recents-preview.no-scale.visible {
-    transform: translateY(0);
-    transition: opacity 0.3s ease;
-  }
+  /* legacy class hooks kept as no-ops so older callers don't have to be ripped out */
+  #recents-preview.visible,
+  #recents-preview.exit-up,
+  #recents-preview.no-scale { /* no-op now — visibility comes from the panel */ }
   #recents-track {
     display: flex;
     gap: 44px;
@@ -134,7 +118,7 @@
     box-shadow: 0 8px 30px rgba(0,0,0,0.35);
   }
 
-  /* ============ Notifications / Quick-settings bottom drawers ============ */
+  /* ============ Viewer carousel: recents | notifications | quick-settings ============ */
   #panels {
     position: absolute;
     inset: 0;                /* full-frame drawer */
@@ -150,7 +134,7 @@
   }
   #panels-track {
     display: flex;
-    width: 1080px;
+    width: 1620px;         /* three 540 panels side by side */
     height: 100%;
     will-change: transform;
     transition: transform 0.28s cubic-bezier(0.22,1,0.36,1);
@@ -468,14 +452,15 @@
   <!-- Dim layer -->
   <div id="recents-bg"></div>
 
-  <!-- Recent apps overview -->
-  <div id="recents-preview">
-    <div id="recents-track"></div>
-  </div>
-
-  <!-- Notifications / Quick-settings bottom drawers -->
+  <!-- Viewer carousel: recents | notifications | quick-settings -->
   <div id="panels">
     <div id="panels-track">
+      <!-- Recents (cards) -->
+      <div class="panel" data-panel="recents">
+        <div id="recents-preview">
+          <div id="recents-track"></div>
+        </div>
+      </div>
       <!-- Notifications: stacked cards -->
       <div class="panel" data-panel="notif">
         <div class="cell" style="left:113px;top:458px;width:314px;height:67px"></div>
@@ -501,6 +486,7 @@
   </div>
   <div id="panel-dots">
     <div class="pdot on"></div>
+    <div class="pdot"></div>
     <div class="pdot"></div>
   </div>
 
@@ -721,34 +707,25 @@ function resetAppScreen() {
   appScreen.style.transformOrigin = '';
 }
 
-function showRecentsView() {
-  recentsPreview.classList.remove('exit-up');
-  recentsPreview.classList.add('visible');
-  recentsBg.classList.add('visible');
-}
-function hideRecentsView() {
-  recentsPreview.classList.remove('visible', 'exit-up');
-  if (!panelsLatched) recentsBg.classList.remove('visible');
-}
-// Live during the drag: recents in place ('in') or sliding up & out ('up')
-function slideRecents(state) {
-  if (state === 'in') {
-    showRecentsView();
-  } else {
-    recentsPreview.classList.remove('visible');
-    recentsPreview.classList.add('exit-up');
-  }
-}
-// Live drawer preview — slides up from behind the dock
-function showDrawer(which) {
-  setPanelIndex(which === 'qs' ? 1 : 0);
+// Live viewer preview: open the panel container at index `i` without latching.
+function previewViewer(i) {
   panels.classList.add('open');
   recentsBg.classList.add('visible');
+  recentsBg.classList.remove('light');
+  setPanelIndex(i);
 }
-function hideDrawer() {
+// Hide the panel container (unless currently latched).
+function closeViewerPreview() {
   if (panelsLatched) return;
   panels.classList.remove('open');
+  if (!recentsLatched) recentsBg.classList.remove('visible');
 }
+// Legacy wrappers kept for compatibility with the rest of the code.
+const showRecentsView = () => previewViewer(0);
+const hideRecentsView = closeViewerPreview;
+const showDrawer = (which) => previewViewer(which === 'qs' ? 2 : 1);
+const hideDrawer = closeViewerPreview;
+const slideRecents = (state) => { if (state === 'in') previewViewer(0); /* 'up' is implicit via panel slide */ };
 
 /* ---------- favourites fan-out ---------- */
 const favTiles = [];
@@ -773,27 +750,34 @@ function closeFan() {
 }
 
 /* ---------- notifications / quick-settings panels ---------- */
+// Viewer indices: 0 = recents, 1 = notifications, 2 = quick-settings
 let panelsLatched = false;
-let panelIndex = 0;     // 0 = notifications (left), 1 = settings (right)
-let lastPanelIndex = 0; // remembers which one to reopen on the next peek
+let panelIndex = 0;
+let lastPanelIndex = 1; // peek reopens this (notif/qs only)
 
 function setPanelIndex(i) {
-  panelIndex = Math.max(0, Math.min(1, i));
-  lastPanelIndex = panelIndex;
+  panelIndex = Math.max(0, Math.min(2, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
   panelDots.forEach((d, k) => d.classList.toggle('on', k === panelIndex));
+  if (panelIndex === 1 || panelIndex === 2) lastPanelIndex = panelIndex;
+  recentsLatched = panelsLatched && panelIndex === 0;
+}
+function openViewer(i) {
+  panelsLatched = true;
+  setPanelIndex(i);
+  panels.classList.add('open');
+  recentsBg.classList.add('visible');
 }
 function hidePanels() {
   panelsLatched = false;
+  recentsLatched = false;
   panels.classList.remove('open');
-  recentsBg.classList.remove('light');
-  if (!recentsLatched) recentsBg.classList.remove('visible');
+  recentsBg.classList.remove('light', 'visible');
 }
 // Quick peek: notif/settings slide up over the app/home, no dock, no minimize.
 function startPeek() {
   panelsLatched = true;
-  recentsLatched = false;
-  setPanelIndex(lastPanelIndex);          // reopen the last-viewed one
+  setPanelIndex(lastPanelIndex);          // reopen the last-viewed (notif/qs)
   panels.classList.add('open');
   recentsBg.classList.add('visible', 'light');
 }
@@ -892,11 +876,11 @@ function setActive(index) {
 // Live preview shown for each dock slot during the drag. To add a new nav
 // surface, add one entry here (and one in routeRelease for the commit).
 const SURFACE_PREVIEW = {
-  running:       () => { hideDrawer(); closeFan(); slideRecents('in'); },
-  favourites:    () => { hideDrawer(); slideRecents('up'); favFan.classList.add('open'); },
-  notifications: () => { closeFan(); slideRecents('up'); showDrawer('notif'); },
-  quicksettings: () => { closeFan(); slideRecents('up'); showDrawer('qs'); },
-  search:        () => { closeFan(); hideDrawer(); slideRecents('up'); showSearch(); },
+  running:       () => { closeFan(); previewViewer(0); },
+  favourites:    () => { closeViewerPreview(); favFan.classList.add('open'); },
+  notifications: () => { closeFan(); previewViewer(1); },
+  quicksettings: () => { closeFan(); previewViewer(2); },
+  search:        () => { closeFan(); closeViewerPreview(); showSearch(); },
 };
 function updateOverview() {
   if (!dock.classList.contains('revealed')) return;
@@ -1043,32 +1027,38 @@ function routeRelease() {
 
 // The drawer is already shown live by the drag — just lock it open on release.
 function commitDrawer(which) {
-  showDrawer(which);                          // panel index + open + dim
-  panelsLatched = true;
-  recentsLatched = false;
+  panelsLatched = true;                       // lock before setPanelIndex so recentsLatched derives correctly
+  setPanelIndex(which === 'qs' ? 2 : 1);
+  panels.classList.add('open');
+  recentsBg.classList.add('visible');
+  recentsBg.classList.remove('light');
   dock.classList.add('revealed');
   closeFan();
-  recentsPreview.classList.remove('visible'); // recents stays slid up
 }
 
 function collapseAll() {
   dock.classList.remove('revealed');
   closeFan();
-  hideDrawer();
   hideSearch();
-  hideRecentsView();
+  panels.classList.remove('open');
+  recentsBg.classList.remove('visible', 'light');
+  panelsLatched = false;
+  recentsLatched = false;
 }
 function latchRecents() {
-  recentsLatched = true;
-  panelsLatched = false;
-  panels.classList.remove('open');
+  panelsLatched = true;
+  setPanelIndex(0);                            // also sets recentsLatched=true
+  panels.classList.add('open');
+  recentsBg.classList.add('visible');
+  recentsBg.classList.remove('light');
   dock.classList.add('revealed');
-  showRecentsView();
   closeFan();
 }
 function unlatchRecents() {
+  panelsLatched = false;
   recentsLatched = false;
-  hideRecentsView();
+  panels.classList.remove('open');
+  recentsBg.classList.remove('visible', 'light');
   dock.classList.remove('revealed');
 }
 function goHome() {
