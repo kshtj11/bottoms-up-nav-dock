@@ -227,7 +227,9 @@
     height: 73px;
   }
 
-  /* 5 equal-width slots, each a wide touch area with a 64px icon tray centred */
+  /* 5 equal-width slots, each a wide touch area with a 64px icon tray centred.
+     Two-step reveal: step 1 = dock slides up flat (CSS on #dock); step 2 = the
+     icons morph into an arc (centre highest), via a delayed transform. */
   .dock-icon {
     flex: 1;
     height: 73px;
@@ -235,7 +237,15 @@
     align-items: center;
     justify-content: center;
     position: relative;
+    transform: translateY(8px);                  /* flat resting before arc settles */
+    transition: transform 0.20s cubic-bezier(0.22,1,0.36,1) 0.10s;
   }
+  /* Arc positions: outer 0, mid -6, centre -12 */
+  #dock.revealed #dock-row .dock-icon:nth-child(1),
+  #dock.revealed #dock-row .dock-icon:nth-child(5) { transform: translateY(0); }
+  #dock.revealed #dock-row .dock-icon:nth-child(2),
+  #dock.revealed #dock-row .dock-icon:nth-child(4) { transform: translateY(-6px); }
+  #dock.revealed #dock-row .dock-icon:nth-child(3) { transform: translateY(-12px); }
 
   .tray {
     width: 64px;
@@ -911,17 +921,21 @@ function updateActiveAndFan(px, py) {
   }
 }
 
-// Index of the element whose horizontal centre is nearest the pointer X
-function nearestByX(els, px) {
+// Index of the element whose horizontal centre is nearest the pointer X.
+// Optional perEl weight multiplier (per index) lets us bias selection — used
+// to narrow the recents (centre) magnetic zone so it's not accidentally hit.
+function nearestByX(els, px, weight) {
   let best = 0, bd = Infinity;
   els.forEach((el, i) => {
     const r = el.getBoundingClientRect();
-    const d = Math.abs(px - (r.left + r.width / 2));
+    const d = Math.abs(px - (r.left + r.width / 2)) * (weight ? weight(i) : 1);
     if (d < bd) { bd = d; best = i; }
   });
   return best;
 }
-const nearestIconIndex = (px) => nearestByX(dockIcons, px);
+// Centre is ~1.7x harder to win → roughly the "upper half" effective zone
+const dockSlotWeight = (i) => i === RUNNING_INDEX ? 1.7 : 1.0;
+const nearestIconIndex = (px) => nearestByX(dockIcons, px, dockSlotWeight);
 const nearestFavIndex  = (px) => nearestByX(favTiles, px);
 
 /* ---------- bottom-edge gesture: swipe UP = overview, swipe L/R = app-switch ---------- */
