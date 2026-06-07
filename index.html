@@ -902,7 +902,7 @@ let gestureFrameRect = null;
 let dragging = false;
 let recentsLatched = false;
 let activeIndex = RUNNING_INDEX;
-const FLICK_VELOCITY = 0.9;
+const FLICK_VELOCITY = 1.9;   // px/ms — must be a deliberate fling, not a normal swipe-up
 
 function activeApp() { return dockIcons[activeIndex].dataset.app; }
 
