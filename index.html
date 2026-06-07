@@ -943,13 +943,17 @@ function setActive(index) {
   updateOverview();
 }
 
-// Live preview shown for each dock slot during the drag. To add a new nav
-// surface, add one entry here (and one in routeRelease for the commit).
+// Live preview shown for each dock slot during the drag. We deliberately
+// DON'T open the notif/qs/recents panels here — opening them mid-drag makes
+// the sheet visibly jump up under the finger. The dock icon highlight is
+// the only feedback during the drag; the chosen panel slides in once on
+// commit. Favourites (fan) and search (keyboard) are still safe to preview
+// because they're not sheets that compete with the dock motion.
 const SURFACE_PREVIEW = {
-  running:       () => { closeFan(); previewViewer(0); },
-  favourites:    () => { closeViewerPreview(); favFan.classList.add('open'); },
-  notifications: () => { closeFan(); previewViewer(1); },
-  quicksettings: () => { closeFan(); previewViewer(2); },
+  running:       () => { closeFan(); closeViewerPreview(); hideSearch(); },
+  favourites:    () => { closeViewerPreview(); hideSearch(); favFan.classList.add('open'); },
+  notifications: () => { closeFan(); closeViewerPreview(); hideSearch(); },
+  quicksettings: () => { closeFan(); closeViewerPreview(); hideSearch(); },
   search:        () => { closeFan(); closeViewerPreview(); showSearch(); },
 };
 function updateOverview() {
@@ -1047,10 +1051,8 @@ swipeZone.addEventListener('pointerdown', (e) => {
           revealed = true;
           revealedAt = performance.now();
           dock.classList.add('revealed');
-          // App stays open behind the dim during the drag — minimize only fires
-          // if the user commits to recents. Show currentApp as the centred card.
-          buildRecentsPreview(false, !!currentApp);
-          updateOverview();
+          // App stays open behind the dim — no panel preview during the drag,
+          // commit on release will slide the chosen panel in once.
         }
       } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
         // app-switch is secondary: needs a long, near-flat sideways drag
