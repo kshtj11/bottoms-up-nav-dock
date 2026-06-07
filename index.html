@@ -978,6 +978,8 @@ swipeZone.addEventListener('pointerdown', (e) => {
   const rightSide = e.clientX > szRect.left + szRect.width * 0.5; // peek half
   let mode = null;                 // null | 'reveal' | 'switch' | 'peek'
   let revealed = false;
+  let revealedAt = 0;              // ms timestamp when arc dock popped
+  let selectLive = false;          // true once finger past travel + dwell — slot tracking on
   let prevY = startY0, prevT = performance.now(), velocity = 0;
   let hPrevX = startX, hPrevT = prevT, hVel = 0;
   dragging = true;
@@ -996,13 +998,14 @@ swipeZone.addEventListener('pointerdown', (e) => {
 
     if (!mode) {
       const up = startY0 - e2.clientY;            // up = the primary gesture
-      if (up > 8) {
+      if (up > 16) {
         if (rightSide) {
           mode = 'peek';                          // right-side up = notif/settings peek
           startPeek();
         } else {
           mode = 'reveal';
           revealed = true;
+          revealedAt = performance.now();
           dock.classList.add('revealed');
           // App stays open behind the dim during the drag — minimize only fires
           // if the user commits to recents. Show currentApp as the centred card.
@@ -1019,7 +1022,12 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (mode === 'reveal') {
       const now = performance.now(), dt = now - prevT;
       if (dt > 0) { velocity = (prevY - e2.clientY) / dt; prevT = now; prevY = e2.clientY; }
-      updateActiveAndFan(e2.clientX, e2.clientY);
+      // Selection only goes live past the reveal-travel window AND a short
+      // dwell, so the user can actually see the icons land before the dock
+      // starts tracking the finger to a slot.
+      const up = startY0 - e2.clientY;
+      if (!selectLive && up > 56 && (now - revealedAt) > 220) selectLive = true;
+      if (selectLive) updateActiveAndFan(e2.clientX, e2.clientY);
     } else if (mode === 'switch') {
       const now = performance.now(), dt = now - hPrevT;
       if (dt > 0) { hVel = (e2.clientX - hPrevX) / dt; hPrevT = now; hPrevX = e2.clientX; }
@@ -1035,11 +1043,11 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (mode === 'reveal') {
       if (liveVel(velocity, prevT) > FLICK_VELOCITY) { goHome(); return; }
       if (!revealed) { collapseAll(); return; }
-      // Two-stage: if the user just popped the arc open without drifting to a
-      // side slot, latch in stage-1 — the dock stays up over the running app,
-      // ready for a second drag/tap to pick a surface. Drifting off-centre is
-      // the power-user one-shot path and commits immediately.
-      if (activeIndex === RUNNING_INDEX) { stageDock(); return; }
+      // Two-stage: if selection never went live (released inside the reveal
+      // window, before the dwell finished, or never drifted off-centre) →
+      // stage-1 latch. Past the live-window with a side-slot pick → one-shot
+      // commit.
+      if (!selectLive || activeIndex === RUNNING_INDEX) { stageDock(); return; }
       routeRelease();
     } else if (mode === 'switch') {
       endSwitch(e2.clientX - startX, liveVel(hVel, hPrevT));
