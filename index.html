@@ -44,7 +44,7 @@
     background: #000000;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.36s cubic-bezier(0.22,1,0.36,1);
+    transition: opacity 0.26s cubic-bezier(0.22,1,0.36,1);
   }
   #recents-bg.visible {
     opacity: 0.75;
@@ -69,7 +69,7 @@
   /* During minimize the app lifts above the overview and zooms into its card */
   #app-screen.minimizing {
     z-index: 15;
-    transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
   }
 
@@ -159,7 +159,7 @@
     overflow: hidden;
     transform: translateY(100%);
     pointer-events: none;
-    transition: transform 0.36s cubic-bezier(0.22,1,0.36,1);
+    transition: transform 0.26s cubic-bezier(0.22,1,0.36,1);
   }
   #panels.open {
     transform: translateY(0);
@@ -170,7 +170,7 @@
     width: 1620px;         /* three 540 panels side by side */
     height: 100%;
     will-change: transform;
-    transition: transform 0.28s cubic-bezier(0.22,1,0.36,1);
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
   }
   .panel {
     position: relative;
@@ -217,7 +217,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.28s cubic-bezier(0.22,1,0.36,1);
+    transition: opacity 0.20s cubic-bezier(0.22,1,0.36,1);
   }
   #dock-row  { opacity: 1; }
   #dock-dots { opacity: 0; gap: 14px; pointer-events: none; }
@@ -252,7 +252,7 @@
     opacity: 0;
     pointer-events: none;
     will-change: transform, opacity;
-    transition: transform 0.34s cubic-bezier(0.22,1,0.36,1), opacity 0.24s ease;
+    transition: transform 0.26s cubic-bezier(0.22,1,0.36,1), opacity 0.20s ease;
   }
   #dock.revealed {
     transform: translateX(-50%) translateY(0);
@@ -281,7 +281,7 @@
     justify-content: center;
     position: relative;
     transform: translateY(8px);                  /* flat resting before arc settles */
-    transition: transform 0.26s cubic-bezier(0.22,1,0.36,1) 0.14s;
+    transition: transform 0.20s cubic-bezier(0.22,1,0.36,1) 0.10s;
   }
   /* Arc positions: outer 0, mid -6, centre -12 */
   #dock.revealed #dock-row .dock-icon:nth-child(1),
@@ -915,7 +915,7 @@ function startMinimize() {
     recentsPreview.classList.remove('no-scale');
   };
   appScreen.addEventListener('transitionend', done);
-  setTimeout(done, 460); // fallback if transitionend doesn't fire
+  setTimeout(done, 340); // fallback if transitionend doesn't fire
 }
 
 /* ---------- global states (only what other handlers read) ---------- */
