@@ -491,6 +491,8 @@
   }
   #dock-fill-toggle { right: 8px; }
   #edge-toggle      { left: 8px; }
+  #favs-toggle      { left: 50%; transform: translateX(-50%); }
+  #frame.no-favs #fav-fan { display: none; }
 
   #frame.dock-bare #dock { background: transparent; }
   #frame.show-edges #deadzone,
@@ -626,6 +628,7 @@
 
   <!-- Corner toggles -->
   <div id="edge-toggle"      class="corner-toggle">Edges: OFF</div>
+  <div id="favs-toggle"      class="corner-toggle">Favs: ON</div>
   <div id="dock-fill-toggle" class="corner-toggle">Dock BG: ON</div>
 
   <!-- Bottom edge -->
@@ -1383,6 +1386,7 @@ function wireToggle(id, cls, labelOn, labelOff, startOn) {
 }
 wireToggle('dock-fill-toggle', 'dock-bare',  'Dock BG: OFF', 'Dock BG: ON',  true);
 wireToggle('edge-toggle',      'show-edges', 'Edges: ON',    'Edges: OFF',   false);
+wireToggle('favs-toggle',      'no-favs',    'Favs: OFF',    'Favs: ON',     false);
 
 buildRecentsPreview();
 </script>
