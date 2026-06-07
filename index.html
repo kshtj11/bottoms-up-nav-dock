@@ -768,6 +768,9 @@ function closeFan() {
 let panelsLatched = false;
 let panelIndex = 0;
 let lastPanelIndex = 1; // peek reopens this (notif/qs only)
+// Two-stage gesture: stage-1 = arc dock revealed over running app, no commit yet.
+// Stage-2 = a second drag from the dock picks a surface (recents / notif / qs / fav / search).
+let dockStaged = false;
 
 // Maps viewer index (0=recents, 1=notif, 2=qs) → dot index (2/3/4)
 const VIEWER_DOT_INDEX = [2, 3, 4];
@@ -782,6 +785,22 @@ function setPanelIndex(i) {
 // Collapse the dock's icon row into the 5-dot indicator.
 function collapseNav() { dock.classList.add('collapsed'); }
 function expandNav()   { dock.classList.remove('collapsed'); }
+// Stage-1 latch: dock visible over the running app, no surface committed yet.
+function stageDock() {
+  dockStaged = true;
+  dock.classList.add('revealed');
+  expandNav();
+  closeFan();
+  closeViewerPreview();                          // tear down any live recents/notif/qs preview
+  hideSearch();
+  recentsBg.classList.add('visible', 'light');   // soft dim so dock pops over the app
+}
+function unstageDock() {
+  if (!dockStaged) return;
+  dockStaged = false;
+  dock.classList.remove('revealed');
+  recentsBg.classList.remove('visible', 'light');
+}
 function openViewer(i) {
   panelsLatched = true;
   setPanelIndex(i);
@@ -951,6 +970,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
   if (searchLatched) { searchLatched = false; hideSearch(); }
+  if (dockStaged)  unstageDock();                 // fresh swipe wipes any prior stage-1
   expandNav();                                    // fresh swipe re-shows the icon row
 
   const startX = e.clientX, startY0 = e.clientY;
@@ -1015,6 +1035,11 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (mode === 'reveal') {
       if (liveVel(velocity, prevT) > FLICK_VELOCITY) { goHome(); return; }
       if (!revealed) { collapseAll(); return; }
+      // Two-stage: if the user just popped the arc open without drifting to a
+      // side slot, latch in stage-1 — the dock stays up over the running app,
+      // ready for a second drag/tap to pick a surface. Drifting off-centre is
+      // the power-user one-shot path and commits immediately.
+      if (activeIndex === RUNNING_INDEX) { stageDock(); return; }
       routeRelease();
     } else if (mode === 'switch') {
       endSwitch(e2.clientX - startX, liveVel(hVel, hPrevT));
@@ -1061,6 +1086,7 @@ function commitDrawer(which) {
 }
 
 function collapseAll() {
+  dockStaged = false;
   dock.classList.remove('revealed');
   expandNav();
   closeFan();
@@ -1211,18 +1237,20 @@ panels.addEventListener('pointerup', (e) => {
 
 /* ===================== dock taps while an overview is latched ===================== */
 dock.addEventListener('pointerdown', (e) => {
-  if (!recentsLatched && !panelsLatched) return;
+  if (!recentsLatched && !panelsLatched && !dockStaged) return;
   e.stopPropagation();
   gestureFrameRect = frame.getBoundingClientRect();
   const wasCollapsed = dock.classList.contains('collapsed');
   const wasPanelsLatched = panelsLatched;
   const wasRecentsLatched = recentsLatched;
+  const wasStaged = dockStaged;
   const wasIndex = panelIndex;
   expandNav();                                  // tap-while-collapsed → icons reappear
   // Re-selecting: drop the committed state so the drag can preview other
   // slots live, but keep whatever's currently shown until the finger moves.
   recentsLatched = false;
   panelsLatched = false;
+  dockStaged = false;
   setActive(nearestIconIndex(e.clientX));
   frame.setPointerCapture(e.pointerId);
   const downX = e.clientX, downY = e.clientY;
@@ -1242,6 +1270,11 @@ dock.addEventListener('pointerdown', (e) => {
       setPanelIndex(wasIndex);
       return;
     }
+    if (!moved && wasStaged) {
+      // Pure tap while stage-1 → re-stage (stay revealed, no commit)
+      stageDock();
+      return;
+    }
     routeRelease();
   };
   frame.addEventListener('pointermove', onMove);
@@ -1251,7 +1284,7 @@ dock.addEventListener('pointerdown', (e) => {
 /* ===================== tap-out dismiss ===================== */
 frame.addEventListener('pointerdown', (e) => {
   if (dragging) return;
-  if (!recentsLatched && !panelsLatched) return;
+  if (!recentsLatched && !panelsLatched && !dockStaged) return;
   if (e.target.closest('.preview-card')) return;
   if (e.target.closest('#dock')) return;
   if (e.target.closest('#panels')) return;
@@ -1259,6 +1292,7 @@ frame.addEventListener('pointerdown', (e) => {
   if (e.target.closest('#swipe-zone')) return;
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
+  if (dockStaged)   unstageDock();
 });
 
 /* ===================== search: swipe down to dismiss ===================== */
