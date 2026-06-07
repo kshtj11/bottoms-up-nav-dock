@@ -157,22 +157,31 @@
     box-shadow: 0 4px 4px rgba(0,0,0,0.25);
     box-shadow: 0 4px 4px color(display-p3 0 0 0 / 0.25);
   }
-  /* page dots — float just above the dock */
-  #panel-dots {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 104px;
-    display: flex;
-    gap: 7px;
-    z-index: 22;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-    pointer-events: none;
+  /* (old #panel-dots removed — replaced by #dock-dots inside the dock) */
+  #panel-dots { display: none; }
+  .pdot { display: none; }
+
+  /* Collapsed nav indicator: 5 dots replace the icon row after commit. */
+  #dock-dots {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    width: 100%;
+    height: 100%;
   }
-  #panels.open ~ #panel-dots { opacity: 1; }
-  .pdot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.4); }
-  .pdot.on { background: #fff; }
+  #dock.collapsed #dock-row  { display: none; }
+  #dock.collapsed #dock-dots { display: flex; }
+  .ndot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.32);
+    transition: transform 0.18s cubic-bezier(0.22,1,0.36,1), background 0.18s ease;
+  }
+  .ndot.on { background: #fff; transform: scale(1.6); }
+  /* search & home dots greyed (non-swipeable in option A) */
+  .ndot[data-non-viewer] { background: rgba(255,255,255,0.18); }
 
   /* ===================== Dock ===================== */
   #dock {
@@ -484,11 +493,7 @@
       </div>
     </div>
   </div>
-  <div id="panel-dots">
-    <div class="pdot on"></div>
-    <div class="pdot"></div>
-    <div class="pdot"></div>
-  </div>
+  <div id="panel-dots"><!-- deprecated, kept hidden --></div>
 
   <!-- Dock -->
   <div id="dock">
@@ -540,6 +545,14 @@
         </div>
       </div>
     </div>
+    <!-- Collapsed indicator: 5 dots replace the icon row after commit -->
+    <div id="dock-dots">
+      <span class="ndot" data-non-viewer></span>
+      <span class="ndot" data-non-viewer></span>
+      <span class="ndot on"></span>
+      <span class="ndot"></span>
+      <span class="ndot"></span>
+    </div>
   </div>
 
   <!-- Search overlay: results + expanding bar + keyboard -->
@@ -584,6 +597,7 @@ const favFan       = document.getElementById('fav-fan');
 const panels       = document.getElementById('panels');
 const panelsTrack  = document.getElementById('panels-track');
 const panelDots    = Array.from(document.querySelectorAll('.pdot'));
+const navDots      = Array.from(document.querySelectorAll('.ndot'));
 const searchOverlay = document.getElementById('search-overlay');
 
 /* ---------- keyboard (visual only, built once) ---------- */
@@ -755,13 +769,19 @@ let panelsLatched = false;
 let panelIndex = 0;
 let lastPanelIndex = 1; // peek reopens this (notif/qs only)
 
+// Maps viewer index (0=recents, 1=notif, 2=qs) → dot index (2/3/4)
+const VIEWER_DOT_INDEX = [2, 3, 4];
 function setPanelIndex(i) {
   panelIndex = Math.max(0, Math.min(2, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
   panelDots.forEach((d, k) => d.classList.toggle('on', k === panelIndex));
+  navDots.forEach((d, k) => d.classList.toggle('on', k === VIEWER_DOT_INDEX[panelIndex]));
   if (panelIndex === 1 || panelIndex === 2) lastPanelIndex = panelIndex;
   recentsLatched = panelsLatched && panelIndex === 0;
 }
+// Collapse the dock's icon row into the 5-dot indicator.
+function collapseNav() { dock.classList.add('collapsed'); }
+function expandNav()   { dock.classList.remove('collapsed'); }
 function openViewer(i) {
   panelsLatched = true;
   setPanelIndex(i);
@@ -773,6 +793,8 @@ function hidePanels() {
   recentsLatched = false;
   panels.classList.remove('open');
   recentsBg.classList.remove('light', 'visible');
+  dock.classList.remove('revealed');
+  expandNav();
 }
 // Quick peek: notif/settings slide up over the app/home, no dock, no minimize.
 function startPeek() {
@@ -929,6 +951,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
   if (searchLatched) { searchLatched = false; hideSearch(); }
+  expandNav();                                    // fresh swipe re-shows the icon row
 
   const startX = e.clientX, startY0 = e.clientY;
   const szRect = swipeZone.getBoundingClientRect();
@@ -1033,11 +1056,13 @@ function commitDrawer(which) {
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
   dock.classList.add('revealed');
+  collapseNav();                              // icons fade to 5-dot indicator
   closeFan();
 }
 
 function collapseAll() {
   dock.classList.remove('revealed');
+  expandNav();
   closeFan();
   hideSearch();
   panels.classList.remove('open');
@@ -1052,6 +1077,7 @@ function latchRecents() {
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
   dock.classList.add('revealed');
+  collapseNav();                               // icons fade to 5-dot indicator
   closeFan();
 }
 function unlatchRecents() {
@@ -1060,6 +1086,7 @@ function unlatchRecents() {
   panels.classList.remove('open');
   recentsBg.classList.remove('visible', 'light');
   dock.classList.remove('revealed');
+  expandNav();
 }
 function goHome() {
   recentsLatched = panelsLatched = searchLatched = false;
@@ -1185,6 +1212,7 @@ dock.addEventListener('pointerdown', (e) => {
   if (!recentsLatched && !panelsLatched) return;
   e.stopPropagation();
   gestureFrameRect = frame.getBoundingClientRect();
+  expandNav();                                  // tap-while-collapsed → icons reappear
   // Re-selecting: drop the committed state so the drag can preview other
   // slots live, but keep whatever's currently shown until the finger moves.
   recentsLatched = false;
