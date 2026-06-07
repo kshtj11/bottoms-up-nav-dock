@@ -184,10 +184,6 @@
     box-shadow: 0 4px 4px rgba(0,0,0,0.25);
     box-shadow: 0 4px 4px color(display-p3 0 0 0 / 0.25);
   }
-  /* (old #panel-dots removed — replaced by #dock-dots inside the dock) */
-  #panel-dots { display: none; }
-  .pdot { display: none; }
-
   /* Collapsed nav indicator: 5 dots replace the icon row after commit. */
   #dock-dots {
     display: none;
@@ -522,8 +518,6 @@
       </div>
     </div>
   </div>
-  <div id="panel-dots"><!-- deprecated, kept hidden --></div>
-
   <!-- Dock -->
   <div id="dock">
     <div id="dock-row">
@@ -625,7 +619,6 @@ const recentsBg    = document.getElementById('recents-bg');
 const favFan       = document.getElementById('fav-fan');
 const panels       = document.getElementById('panels');
 const panelsTrack  = document.getElementById('panels-track');
-const panelDots    = Array.from(document.querySelectorAll('.pdot'));
 const navDots      = Array.from(document.querySelectorAll('.ndot'));
 const searchOverlay = document.getElementById('search-overlay');
 
@@ -750,25 +743,14 @@ function resetAppScreen() {
   appScreen.style.transformOrigin = '';
 }
 
-// Live viewer preview: open the panel container at index `i` without latching.
-function previewViewer(i) {
-  panels.classList.add('open');
-  recentsBg.classList.add('visible');
-  recentsBg.classList.remove('light');
-  setPanelIndex(i);
-}
-// Hide the panel container (unless currently latched).
+// Hide the panel container (unless currently latched). The only caller now
+// is the staging/dock flow — nothing ever opens the panel pre-commit, so
+// the matching previewViewer helper has been removed.
 function closeViewerPreview() {
   if (panelsLatched) return;
   panels.classList.remove('open');
   if (!recentsLatched) recentsBg.classList.remove('visible');
 }
-// Legacy wrappers kept for compatibility with the rest of the code.
-const showRecentsView = () => previewViewer(0);
-const hideRecentsView = closeViewerPreview;
-const showDrawer = (which) => previewViewer(which === 'qs' ? 2 : 1);
-const hideDrawer = closeViewerPreview;
-const slideRecents = (state) => { if (state === 'in') previewViewer(0); /* 'up' is implicit via panel slide */ };
 
 /* ---------- favourites fan-out ---------- */
 const favTiles = [];
@@ -796,7 +778,6 @@ function closeFan() {
 // Viewer indices: 0 = recents, 1 = notifications, 2 = quick-settings
 let panelsLatched = false;
 let panelIndex = 0;
-let lastPanelIndex = 1; // peek reopens this (notif/qs only)
 // Two-stage gesture: stage-1 = arc dock revealed over running app, no commit yet.
 // Stage-2 = a second drag from the dock picks a surface (recents / notif / qs / fav / search).
 let dockStaged = false;
@@ -806,9 +787,7 @@ const VIEWER_DOT_INDEX = [2, 3, 4];
 function setPanelIndex(i) {
   panelIndex = Math.max(0, Math.min(2, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
-  panelDots.forEach((d, k) => d.classList.toggle('on', k === panelIndex));
   navDots.forEach((d, k) => d.classList.toggle('on', k === VIEWER_DOT_INDEX[panelIndex]));
-  if (panelIndex === 1 || panelIndex === 2) lastPanelIndex = panelIndex;
   recentsLatched = panelsLatched && panelIndex === 0;
 }
 // Collapse the dock's icon row into the 5-dot indicator.
@@ -830,12 +809,6 @@ function unstageDock() {
   dock.classList.remove('revealed');
   recentsBg.classList.remove('visible', 'light');
 }
-function openViewer(i) {
-  panelsLatched = true;
-  setPanelIndex(i);
-  panels.classList.add('open');
-  recentsBg.classList.add('visible');
-}
 function hidePanels() {
   panelsLatched = false;
   recentsLatched = false;
@@ -844,14 +817,6 @@ function hidePanels() {
   dock.classList.remove('revealed');
   expandNav();
 }
-// Quick peek: notif/settings slide up over the app/home, no dock, no minimize.
-function startPeek() {
-  panelsLatched = true;
-  setPanelIndex(lastPanelIndex);          // reopen the last-viewed (notif/qs)
-  panels.classList.add('open');
-  recentsBg.classList.add('visible', 'light');
-}
-
 /* ---------- foreground app ---------- */
 function openApp(key) {
   currentApp = key;
@@ -1018,9 +983,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
   expandNav();                                    // fresh swipe re-shows the icon row
 
   const startX = e.clientX, startY0 = e.clientY;
-  const szRect = swipeZone.getBoundingClientRect();
-  const rightSide = e.clientX > szRect.left + szRect.width * 0.5; // peek half
-  let mode = null;                 // null | 'reveal' | 'switch' | 'peek'
+  let mode = null;                 // null | 'reveal' | 'switch'
   let revealed = false;
   let revealedAt = 0;              // ms timestamp when arc dock popped
   let selectLive = false;          // true once finger past travel + dwell — slot tracking on
@@ -1043,17 +1006,12 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (!mode) {
       const up = startY0 - e2.clientY;            // up = the primary gesture
       if (up > 16) {
-        if (rightSide) {
-          mode = 'peek';                          // right-side up = notif/settings peek
-          startPeek();
-        } else {
-          mode = 'reveal';
-          revealed = true;
-          revealedAt = performance.now();
-          dock.classList.add('revealed');
-          // App stays open behind the dim — no panel preview during the drag,
-          // commit on release will slide the chosen panel in once.
-        }
+        mode = 'reveal';
+        revealed = true;
+        revealedAt = performance.now();
+        dock.classList.add('revealed');
+        // App stays open behind the dim — no panel preview during the drag,
+        // commit on release will slide the chosen panel in once.
       } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
         // app-switch is secondary: needs a long, near-flat sideways drag
         mode = 'switch';
