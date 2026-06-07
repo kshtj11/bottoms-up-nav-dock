@@ -1170,6 +1170,7 @@ let pDragging=false, pStartX=0, pStartY=0, pBase=0, pMode=null;
 const PANEL_DISMISS_PX = 90;
 panels.addEventListener('pointerdown', (e) => {
   if (!panelsLatched) return;
+  if (e.target.closest('.preview-card')) return;  // recents card handles its own gestures
   pDragging = true; pMode = null;
   pStartX = e.clientX; pStartY = e.clientY; pBase = -540 * panelIndex;
   panels.setPointerCapture(e.pointerId);
@@ -1202,9 +1203,10 @@ panels.addEventListener('pointerup', (e) => {
     return;
   }
   panelsTrack.style.transition = '';
-  let idx = panelIndex;
-  if (dx < -60) idx = 1; else if (dx > 60) idx = 0;
-  setPanelIndex(idx);
+  // ±1 swipe across viewers (option A: recents↔notif↔qs); clamp via setPanelIndex
+  let delta = 0;
+  if (dx < -60) delta = 1; else if (dx > 60) delta = -1;
+  setPanelIndex(panelIndex + delta);
 });
 
 /* ===================== dock taps while an overview is latched ===================== */
