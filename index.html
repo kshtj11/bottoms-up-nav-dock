@@ -1214,6 +1214,10 @@ dock.addEventListener('pointerdown', (e) => {
   if (!recentsLatched && !panelsLatched) return;
   e.stopPropagation();
   gestureFrameRect = frame.getBoundingClientRect();
+  const wasCollapsed = dock.classList.contains('collapsed');
+  const wasPanelsLatched = panelsLatched;
+  const wasRecentsLatched = recentsLatched;
+  const wasIndex = panelIndex;
   expandNav();                                  // tap-while-collapsed → icons reappear
   // Re-selecting: drop the committed state so the drag can preview other
   // slots live, but keep whatever's currently shown until the finger moves.
@@ -1221,11 +1225,23 @@ dock.addEventListener('pointerdown', (e) => {
   panelsLatched = false;
   setActive(nearestIconIndex(e.clientX));
   frame.setPointerCapture(e.pointerId);
+  const downX = e.clientX, downY = e.clientY;
+  let moved = false;
 
-  const onMove = (ev) => updateActiveAndFan(ev.clientX, ev.clientY);
+  const onMove = (ev) => {
+    if (!moved && Math.hypot(ev.clientX - downX, ev.clientY - downY) > 6) moved = true;
+    updateActiveAndFan(ev.clientX, ev.clientY);
+  };
   const onUp = () => {
     frame.removeEventListener('pointermove', onMove);
     frame.removeEventListener('pointerup', onUp);
+    if (!moved && wasCollapsed) {
+      // Pure tap on the collapsed dock → just stay expanded; restore prior state
+      panelsLatched = wasPanelsLatched;
+      recentsLatched = wasRecentsLatched;
+      setPanelIndex(wasIndex);
+      return;
+    }
     routeRelease();
   };
   frame.addEventListener('pointermove', onMove);
