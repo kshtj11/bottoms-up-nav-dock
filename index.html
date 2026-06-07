@@ -1083,12 +1083,16 @@ swipeZone.addEventListener('pointerdown', (e) => {
       // window, before the dwell finished, or never drifted off-centre) →
       // stage-1 latch. Past the live-window with a side-slot pick → one-shot
       // commit.
-      if (!selectLive || activeIndex === RUNNING_INDEX) {
-        // If we already kicked off the minimize, the app is no longer
-        // full-size behind — show recents so the user sees the card their
-        // app shrunk into instead of empty dim. Otherwise (swipe from home,
-        // nothing to minimize) stage-1 over the home is fine.
-        if (minimizedThisGesture) { latchRecents(); return; }
+      if (!selectLive) { stageDock(); return; }
+      if (activeIndex === RUNNING_INDEX) {
+        // Centre release. Three cases:
+        //  (a) minimize already ran → app is a card, show recents.
+        //  (b) the user kept dragging well past the live-window (> 180 px
+        //      up from the start) → they're clearly committing to recents
+        //      in one continuous motion. Open recents directly.
+        //  (c) shorter centred release → stage-1 latch (the two-stage flow).
+        const upTravel = startY0 - e2.clientY;
+        if (minimizedThisGesture || upTravel > 180) { latchRecents(); return; }
         stageDock(); return;
       }
       routeRelease();
