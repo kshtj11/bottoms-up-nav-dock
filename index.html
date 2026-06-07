@@ -1014,6 +1014,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
   let revealed = false;
   let revealedAt = 0;              // ms timestamp when arc dock popped
   let selectLive = false;          // true once finger past travel + dwell — slot tracking on
+  let minimizedThisGesture = false; // true if startMinimize fired on reveal
   let prevY = startY0, prevT = performance.now(), velocity = 0;
   let hPrevX = startX, hPrevT = prevT, hVel = 0;
   dragging = true;
@@ -1037,8 +1038,13 @@ swipeZone.addEventListener('pointerdown', (e) => {
         revealed = true;
         revealedAt = performance.now();
         dock.classList.add('revealed');
-        // App stays open behind the dim — no panel preview during the drag,
-        // commit on release will slide the chosen panel in once.
+        // Start minimizing the foreground app the instant the swipe begins —
+        // the user sees the app shrink toward its recents-card slot in
+        // parallel with the dock rising. By the time they pick a surface and
+        // release, the heavy zoom is already done; commit just slides the
+        // chosen panel in. The app becomes a recents card regardless of which
+        // surface they end up committing to.
+        if (currentApp) { startMinimize(); minimizedThisGesture = true; }
       } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
         // app-switch is secondary: needs a long, near-flat sideways drag
         mode = 'switch';
@@ -1074,7 +1080,14 @@ swipeZone.addEventListener('pointerdown', (e) => {
       // window, before the dwell finished, or never drifted off-centre) →
       // stage-1 latch. Past the live-window with a side-slot pick → one-shot
       // commit.
-      if (!selectLive || activeIndex === RUNNING_INDEX) { stageDock(); return; }
+      if (!selectLive || activeIndex === RUNNING_INDEX) {
+        // If we already kicked off the minimize, the app is no longer
+        // full-size behind — show recents so the user sees the card their
+        // app shrunk into instead of empty dim. Otherwise (swipe from home,
+        // nothing to minimize) stage-1 over the home is fine.
+        if (minimizedThisGesture) { latchRecents(); return; }
+        stageDock(); return;
+      }
       routeRelease();
     } else if (mode === 'switch') {
       endSwitch(e2.clientX - startX, liveVel(hVel, hPrevT));
@@ -1090,7 +1103,9 @@ swipeZone.addEventListener('pointerdown', (e) => {
 function routeRelease() {
   const app = activeApp();
   if (app === 'running') {
-    if (currentApp) startMinimize();  // app zooms into its already-centred card
+    // startMinimize already fired on swipe-up reveal; this just locks the
+    // recents panel open over the already-shrunken card.
+    if (currentApp) startMinimize();
     latchRecents();
   } else if (app === 'favourites') {
     if (favSelected >= 0) {
