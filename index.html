@@ -187,16 +187,6 @@
     background: #111;
     background: color(display-p3 0.07 0.07 0.07);
   }
-  .panel[data-panel="notif"]::before,
-  .panel[data-panel="qs"]::before {
-    content: '';
-    position: absolute;
-    top: 14px; left: 50%;
-    transform: translateX(-50%);
-    width: 56px; height: 5px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.22);
-  }
   /* drawer cells (quick-settings tiles & notification cards) */
   .cell {
     position: absolute;
@@ -1130,10 +1120,21 @@ function routeRelease() {
   }
 }
 
+// Snap the panels-track horizontally to the target index WITHOUT animation,
+// so the subsequent #panels slide-up is purely vertical. Otherwise the
+// horizontal translate animates in parallel with the vertical reveal and
+// the panel reads as 'coming from the corner'.
+function snapPanelIndex(i) {
+  panelsTrack.style.transition = 'none';
+  setPanelIndex(i);
+  void panelsTrack.offsetWidth;               // flush layout
+  panelsTrack.style.transition = '';
+}
+
 // The drawer is already shown live by the drag — just lock it open on release.
 function commitDrawer(which) {
   panelsLatched = true;                       // lock before setPanelIndex so recentsLatched derives correctly
-  setPanelIndex(which === 'qs' ? 2 : 1);
+  snapPanelIndex(which === 'qs' ? 2 : 1);
   panels.classList.add('open');
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
@@ -1155,7 +1156,7 @@ function collapseAll() {
 }
 function latchRecents() {
   panelsLatched = true;
-  setPanelIndex(0);                            // also sets recentsLatched=true
+  snapPanelIndex(0);                           // also sets recentsLatched=true (via setPanelIndex)
   panels.classList.add('open');
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
