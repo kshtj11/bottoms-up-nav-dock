@@ -939,7 +939,10 @@ function updateActiveAndFan(px, py) {
     setFavSel(nearestFavIndex(px));
     return;
   }
-  setActive(nearestIconIndex(px));
+  const hit = hitIconIndex(px);
+  // Over a gap → no slot armed: snap back to the running centre so a release
+  // here lands in stage-1 instead of accidentally committing a neighbour.
+  setActive(hit === -1 ? RUNNING_INDEX : hit);
   if (activeApp() === 'favourites') {
     favFan.classList.add('open');
     setFavSel(-1);
@@ -947,8 +950,7 @@ function updateActiveAndFan(px, py) {
 }
 
 // Index of the element whose horizontal centre is nearest the pointer X.
-// Optional perEl weight multiplier (per index) lets us bias selection — used
-// to narrow the recents (centre) magnetic zone so it's not accidentally hit.
+// Optional perEl weight multiplier (per index) lets us bias selection.
 function nearestByX(els, px, weight) {
   let best = 0, bd = Infinity;
   els.forEach((el, i) => {
@@ -958,9 +960,18 @@ function nearestByX(els, px, weight) {
   });
   return best;
 }
-// Centre is ~1.7x harder to win → roughly the "upper half" effective zone
-const dockSlotWeight = (i) => i === RUNNING_INDEX ? 1.7 : 1.0;
-const nearestIconIndex = (px) => nearestByX(dockIcons, px, dockSlotWeight);
+// Strict hit-test: returns the icon index whose inner tray contains px, else -1.
+// We test the tray (the visible 64×64 chip) instead of the full slot so the
+// gaps between icons select nothing.
+function hitIconIndex(px) {
+  for (let i = 0; i < dockIcons.length; i++) {
+    const tray = dockIcons[i].querySelector('.tray');
+    if (!tray) continue;
+    const r = tray.getBoundingClientRect();
+    if (px >= r.left && px <= r.right) return i;
+  }
+  return -1;
+}
 const nearestFavIndex  = (px) => nearestByX(favTiles, px);
 
 /* ---------- bottom-edge gesture: swipe UP = overview, swipe L/R = app-switch ---------- */
@@ -1259,7 +1270,7 @@ dock.addEventListener('pointerdown', (e) => {
   recentsLatched = false;
   panelsLatched = false;
   dockStaged = false;
-  setActive(nearestIconIndex(e.clientX));
+  { const h = hitIconIndex(e.clientX); setActive(h === -1 ? RUNNING_INDEX : h); }
   frame.setPointerCapture(e.pointerId);
   const downX = e.clientX, downY = e.clientY;
   let moved = false;
