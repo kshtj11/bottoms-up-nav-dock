@@ -44,7 +44,7 @@
     background: #000000;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s ease;
+    transition: opacity 0.36s cubic-bezier(0.22,1,0.36,1);
   }
   #recents-bg.visible {
     opacity: 0.75;
@@ -69,7 +69,7 @@
   /* During minimize the app lifts above the overview and zooms into its card */
   #app-screen.minimizing {
     z-index: 15;
-    transition: transform 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
   }
 
@@ -159,7 +159,7 @@
     overflow: hidden;
     transform: translateY(100%);
     pointer-events: none;
-    transition: transform 0.24s cubic-bezier(0.22,1,0.36,1);
+    transition: transform 0.36s cubic-bezier(0.22,1,0.36,1);
   }
   #panels.open {
     transform: translateY(0);
@@ -208,18 +208,21 @@
     box-shadow: 0 4px 4px rgba(0,0,0,0.25);
     box-shadow: 0 4px 4px color(display-p3 0 0 0 / 0.25);
   }
-  /* Collapsed nav indicator: 5 dots replace the icon row after commit. */
-  #dock-dots {
-    display: none;
-    flex-direction: row;
+  /* Collapsed nav indicator: 5 dots crossfade in over the icon row. Both
+     children are stacked and we transition opacity so the swap is smooth
+     instead of a hard display:none flip. */
+  #dock-row, #dock-dots {
+    position: absolute;
+    inset: 0;
+    display: flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    width: 100%;
-    height: 100%;
+    transition: opacity 0.28s cubic-bezier(0.22,1,0.36,1);
   }
-  #dock.collapsed #dock-row  { display: none; }
-  #dock.collapsed #dock-dots { display: flex; }
+  #dock-row  { opacity: 1; }
+  #dock-dots { opacity: 0; gap: 14px; pointer-events: none; }
+  #dock.collapsed #dock-row  { opacity: 0; pointer-events: none; }
+  #dock.collapsed #dock-dots { opacity: 1; pointer-events: auto; }
   .ndot {
     width: 8px; height: 8px;
     border-radius: 50%;
@@ -249,7 +252,7 @@
     opacity: 0;
     pointer-events: none;
     will-change: transform, opacity;
-    transition: transform 0.28s cubic-bezier(0.22,1,0.36,1), opacity 0.2s ease;
+    transition: transform 0.34s cubic-bezier(0.22,1,0.36,1), opacity 0.24s ease;
   }
   #dock.revealed {
     transform: translateX(-50%) translateY(0);
@@ -278,7 +281,7 @@
     justify-content: center;
     position: relative;
     transform: translateY(8px);                  /* flat resting before arc settles */
-    transition: transform 0.20s cubic-bezier(0.22,1,0.36,1) 0.10s;
+    transition: transform 0.26s cubic-bezier(0.22,1,0.36,1) 0.14s;
   }
   /* Arc positions: outer 0, mid -6, centre -12 */
   #dock.revealed #dock-row .dock-icon:nth-child(1),
@@ -912,7 +915,7 @@ function startMinimize() {
     recentsPreview.classList.remove('no-scale');
   };
   appScreen.addEventListener('transitionend', done);
-  setTimeout(done, 420); // fallback if transitionend doesn't fire
+  setTimeout(done, 460); // fallback if transitionend doesn't fire
 }
 
 /* ---------- global states (only what other handlers read) ---------- */
