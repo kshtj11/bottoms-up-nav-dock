@@ -177,8 +177,13 @@
     width: 540px;
     height: 620px;
     flex: none;
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
     /* recents stays transparent (translucent carousel over the dim) */
   }
+  /* When the dock has collapsed to dots (saving 13 px), shift the panel
+     contents down by the same amount so the layout breathes into the
+     freed space instead of leaving a gap above the dots. */
+  #frame.dock-collapsed .panel { transform: translateY(13px); }
   /* Opaque viewers (notifications, quick-settings) — solid sheet so the
      home/app behind doesn't bleed through, with a tiny grabber header
      and a reserved bottom strip for the dock dots. */
@@ -242,8 +247,13 @@
     opacity: 0;
     pointer-events: none;
     will-change: transform, opacity;
-    transition: transform 0.26s cubic-bezier(0.22,1,0.36,1), opacity 0.20s ease;
+    transition: transform 0.26s cubic-bezier(0.22,1,0.36,1),
+                opacity 0.20s ease,
+                height 0.22s cubic-bezier(0.22,1,0.36,1);
   }
+  /* Collapsed (dots) state — shorter dock so the panel content can take
+     the freed space. Touching the dots expands it back to icon height. */
+  #dock.collapsed { height: 60px; }
   #dock.revealed {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
@@ -810,9 +820,11 @@ function setPanelIndex(i) {
   navDots.forEach((d, k) => d.classList.toggle('on', k === VIEWER_DOT_INDEX[panelIndex]));
   recentsLatched = panelsLatched && panelIndex === 0;
 }
-// Collapse the dock's icon row into the 5-dot indicator.
-function collapseNav() { dock.classList.add('collapsed'); }
-function expandNav()   { dock.classList.remove('collapsed'); }
+// Collapse the dock's icon row into the 5-dot indicator. We mirror the
+// state onto #frame too so panel contents can shift down into the space
+// freed by the shorter dock.
+function collapseNav() { dock.classList.add('collapsed'); frame.classList.add('dock-collapsed'); }
+function expandNav()   { dock.classList.remove('collapsed'); frame.classList.remove('dock-collapsed'); }
 // Stage-1 latch: dock visible over the running app, no surface committed yet.
 function stageDock() {
   dockStaged = true;
