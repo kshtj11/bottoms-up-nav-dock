@@ -87,10 +87,11 @@
   #app-strip:not(.active) { display: none; }
   .app-panel { width: 540px; height: 620px; flex: none; }
 
-  /* Recent apps overview — now nested inside the recents panel of the viewer */
+  /* Recent apps overview — nested inside the recents panel of the viewer.
+     Sits between the top status area and the dock reserve at the bottom. */
   #recents-preview {
     position: absolute;
-    top: 113px;
+    top: 88px;
     left: 0;
     width: 540px;
     height: 372px;
@@ -99,6 +100,14 @@
     justify-content: center;
     overflow: visible;
     pointer-events: auto;
+  }
+  /* Soft top/bottom fade so the carousel doesn't visually run into the
+     dim home content above or the dock-dot strip below. */
+  .panel[data-panel="recents"] {
+    -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0, #000 56px, #000 calc(100% - 96px), transparent 100%);
+            mask-image: linear-gradient(to bottom,
+      transparent 0, #000 56px, #000 calc(100% - 96px), transparent 100%);
   }
   /* legacy class hooks kept as no-ops so older callers don't have to be ripped out */
   #recents-preview.visible,
@@ -144,7 +153,25 @@
     width: 540px;
     height: 620px;
     flex: none;
-    /* transparent — only the inner cells show, over the dimmed home */
+    /* recents stays transparent (translucent carousel over the dim) */
+  }
+  /* Opaque viewers (notifications, quick-settings) — solid sheet so the
+     home/app behind doesn't bleed through, with a tiny grabber header
+     and a reserved bottom strip for the dock dots. */
+  .panel[data-panel="notif"],
+  .panel[data-panel="qs"] {
+    background: #111;
+    background: color(display-p3 0.07 0.07 0.07);
+  }
+  .panel[data-panel="notif"]::before,
+  .panel[data-panel="qs"]::before {
+    content: '';
+    position: absolute;
+    top: 14px; left: 50%;
+    transform: translateX(-50%);
+    width: 56px; height: 5px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.22);
   }
   /* drawer cells (quick-settings tiles & notification cards) */
   .cell {
@@ -470,26 +497,28 @@
           <div id="recents-track"></div>
         </div>
       </div>
-      <!-- Notifications: stacked cards -->
+      <!-- Notifications: stacked cards. Content lives between the header
+           (~36 px) and the dock-dots reserve (~88 px from bottom). -->
       <div class="panel" data-panel="notif">
-        <div class="cell" style="left:113px;top:458px;width:314px;height:67px"></div>
-        <div class="cell" style="left:48px;top:346px;width:444px;height:93px"></div>
-        <div class="cell shadow" style="left:40px;top:331px;width:460px;height:97px"></div>
-        <div class="cell" style="left:40px;top:211px;width:460px;height:97px"></div>
-        <div class="cell" style="left:40px;top:91px;width:460px;height:97px"></div>
+        <div class="cell" style="left:40px;top:48px;width:460px;height:88px"></div>
+        <div class="cell" style="left:40px;top:152px;width:460px;height:88px"></div>
+        <div class="cell shadow" style="left:40px;top:264px;width:460px;height:92px"></div>
+        <div class="cell" style="left:48px;top:278px;width:444px;height:88px"></div>
+        <div class="cell" style="left:113px;top:388px;width:314px;height:64px"></div>
       </div>
-      <!-- Quick settings: tile grid -->
+      <!-- Quick settings: tile grid. Same header + dock reserve. -->
       <div class="panel" data-panel="qs">
-        <div class="cell" style="left:40px;top:176px;width:97px;height:97px"></div>
-        <div class="cell" style="left:161px;top:176px;width:97px;height:97px"></div>
-        <div class="cell" style="left:282px;top:176px;width:97px;height:97px"></div>
-        <div class="cell" style="left:403px;top:176px;width:97px;height:97px"></div>
-        <div class="cell" style="left:40px;top:295px;width:97px;height:97px"></div>
-        <div class="cell" style="left:161px;top:295px;width:97px;height:97px"></div>
-        <div class="cell" style="left:282px;top:295px;width:97px;height:97px"></div>
-        <div class="cell" style="left:403px;top:295px;width:97px;height:97px"></div>
-        <div class="cell" style="left:40px;top:423px;width:216px;height:97px"></div>
-        <div class="cell" style="left:280px;top:423px;width:216px;height:97px"></div>
+        <div class="cell" style="left:40px;top:60px;width:97px;height:97px"></div>
+        <div class="cell" style="left:161px;top:60px;width:97px;height:97px"></div>
+        <div class="cell" style="left:282px;top:60px;width:97px;height:97px"></div>
+        <div class="cell" style="left:403px;top:60px;width:97px;height:97px"></div>
+        <div class="cell" style="left:40px;top:177px;width:97px;height:97px"></div>
+        <div class="cell" style="left:161px;top:177px;width:97px;height:97px"></div>
+        <div class="cell" style="left:282px;top:177px;width:97px;height:97px"></div>
+        <div class="cell" style="left:403px;top:177px;width:97px;height:97px"></div>
+        <div class="cell" style="left:40px;top:294px;width:216px;height:97px"></div>
+        <div class="cell" style="left:280px;top:294px;width:216px;height:97px"></div>
+        <div class="cell" style="left:40px;top:411px;width:460px;height:42px"></div>
       </div>
     </div>
   </div>
@@ -883,7 +912,7 @@ function startMinimize() {
   appScreen.classList.add('minimizing');    // z15 — above dim + recents
   appScreen.style.transformOrigin = 'top left';
   void appScreen.offsetWidth;               // commit the full-size start state
-  appScreen.style.transform = 'translate(108px, 113px) scale(0.6)';
+  appScreen.style.transform = 'translate(108px, 88px) scale(0.6)';
 
   let finished = false;
   const done = () => {
