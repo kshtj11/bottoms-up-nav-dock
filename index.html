@@ -165,7 +165,7 @@
   }
   #panels-track {
     display: flex;
-    width: 1620px;         /* three 540 panels side by side */
+    width: 2160px;         /* four 540 panels side by side: fav | recents | notif | qs */
     height: 100%;
     will-change: transform;
     transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
@@ -175,20 +175,28 @@
     width: 540px;
     height: 620px;
     flex: none;
+    overflow: hidden;          /* keep recents carousel cards inside their panel */
     transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
-    /* recents stays transparent (translucent carousel over the dim) */
   }
   /* When the dock has collapsed to dots, shift the panel contents down so
      they end just above the dot strip (using the space that the icon row
      used to occupy). 78px (icon dock) − 22px (dots) = 56px gained. */
   #frame.dock-collapsed .panel { transform: translateY(56px); transition: transform 0.20s cubic-bezier(0.22,1,0.36,1); }
-  /* Opaque viewers (notifications, quick-settings) — solid sheet so the
-     home/app behind doesn't bleed through, with a tiny grabber header
-     and a reserved bottom strip for the dock dots. */
+  /* Opaque viewers (favourites, notifications, quick-settings) — solid sheet
+     so the home/app behind doesn't bleed through. */
+  .panel[data-panel="fav"],
   .panel[data-panel="notif"],
   .panel[data-panel="qs"] {
     background: #111;
     background: color(display-p3 0.07 0.07 0.07);
+  }
+  /* Favourites tiles — 97x97 squares in a 2x4 grid, pastel-coloured. */
+  .fav-tile {
+    position: absolute;
+    width: 97px;
+    height: 97px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
   }
   /* drawer cells (quick-settings tiles & notification cards) */
   .cell {
@@ -215,18 +223,37 @@
     transform-origin: 50% 100%;            /* shrink toward the bottom strip */
   }
   #dock-row  { opacity: 1; transform: scale(1); }
-  #dock-dots { opacity: 0; gap: 14px; pointer-events: none; transform: scale(1.6); transform-origin: 50% 50%; }
+  #dock-dots { opacity: 0; gap: 16px; pointer-events: none; transform: scale(1.6); transform-origin: 50% 50%; }
   #dock.collapsed #dock-row  { opacity: 0; pointer-events: none; transform: scale(0.28); }
   #dock.collapsed #dock-dots { opacity: 1; pointer-events: auto; transform: scale(1); }
   .ndot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.32);
-    transition: transform 0.18s cubic-bezier(0.22,1,0.36,1), background 0.18s ease;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.18s ease;
   }
-  .ndot.on { background: #fff; transform: scale(1.6); }
-  /* search & home dots greyed (non-swipeable in option A) */
-  .ndot[data-non-viewer] { background: rgba(255,255,255,0.18); }
+  .ndot svg { width: 16px; height: 16px; display: block; }
+  /* default grey fill on every glyph (paths, circles, rects) */
+  .ndot svg path,
+  .ndot svg circle,
+  .ndot svg rect {
+    fill: rgba(255,255,255,0.32);
+    transition: fill 0.18s ease;
+  }
+  /* active = full white */
+  .ndot.on svg path,
+  .ndot.on svg circle,
+  .ndot.on svg rect {
+    fill: #fff;
+  }
+  /* non-viewer (search) — dimmer grey */
+  .ndot[data-non-viewer] svg path,
+  .ndot[data-non-viewer] svg circle,
+  .ndot[data-non-viewer] svg rect {
+    fill: rgba(255,255,255,0.18);
+  }
 
   /* Solid black plate that sits behind the dock area whenever the dock
      is visible but no committed panel is covering it (i.e. stage-1).
@@ -336,38 +363,6 @@
     height: 34px;
     display: block;
   }
-
-  /* ===================== Favourites fan-out ===================== */
-  #fav-fan {
-    position: absolute;
-    left: 19px;           /* anchored at the favourites slot, expands rightwards */
-    bottom: 119px;        /* 10px higher */
-    width: 346px;         /* 4 tiles + 1.5x spacing (30px gaps) */
-    height: 64px;
-    display: flex;
-    justify-content: flex-start;
-    gap: 30px;
-    align-items: center;
-    z-index: 21;
-    opacity: 0;
-    transform: translateY(16px);
-    pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22,1,0.36,1);
-  }
-  #fav-fan.open {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .fav-tile {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    object-fit: cover;
-    background: #222;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-    transition: transform 0.16s cubic-bezier(0.22,1,0.36,1);
-  }
-  .fav-tile.sel { transform: scale(1.28) translateY(-6px); }
 
   /* ===================== Search (bar + keyboard + results) ===================== */
   #search-overlay {
@@ -520,8 +515,6 @@
   }
   #dock-fill-toggle { right: 8px; }
   #edge-toggle      { left: 8px; }
-  #favs-toggle      { left: 50%; transform: translateX(-50%); }
-  #frame.no-favs #fav-fan { display: none; }
 
   #frame.dock-bare #dock { background: transparent; }
   #frame.show-edges #deadzone,
@@ -542,9 +535,20 @@
   <!-- Dim layer -->
   <div id="recents-bg"></div>
 
-  <!-- Viewer carousel: recents | notifications | quick-settings -->
+  <!-- Viewer carousel: fav | recents | notifications | quick-settings -->
   <div id="panels">
     <div id="panels-track">
+      <!-- Favourites: 8-app grid (2 rows × 4 cols), pastel colors. -->
+      <div class="panel" data-panel="fav">
+        <div class="fav-tile" style="left:40px;top:60px;background:#FFD6E0"></div>
+        <div class="fav-tile" style="left:161px;top:60px;background:#CDE7B0"></div>
+        <div class="fav-tile" style="left:282px;top:60px;background:#BEDDFF"></div>
+        <div class="fav-tile" style="left:403px;top:60px;background:#FFE2B5"></div>
+        <div class="fav-tile" style="left:40px;top:177px;background:#D4B2FF"></div>
+        <div class="fav-tile" style="left:161px;top:177px;background:#FFBBBC"></div>
+        <div class="fav-tile" style="left:282px;top:177px;background:#A8E6CF"></div>
+        <div class="fav-tile" style="left:403px;top:177px;background:#FFEAA7"></div>
+      </div>
       <!-- Recents (cards) -->
       <div class="panel" data-panel="recents">
         <div id="recents-preview">
@@ -582,20 +586,20 @@
   <!-- Dock -->
   <div id="dock">
     <div id="dock-row">
-      <!-- 0: Home (release = go home); the 4-app fan is a bonus -->
-      <div class="dock-icon" data-app="favourites">
-        <div class="tray">
-          <svg class="glyph" viewBox="0 0 256 256" fill="#fff">
-            <path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"></path>
-          </svg>
-        </div>
-      </div>
-      <!-- 1: Search -->
+      <!-- 0: Search -->
       <div class="dock-icon" data-app="search">
         <div class="tray">
           <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="10.5" cy="10.5" r="6.5"/>
             <line x1="15.5" y1="15.5" x2="21" y2="21"/>
+          </svg>
+        </div>
+      </div>
+      <!-- 1: Favourites — 8-point star, opens an 8-app overlay -->
+      <div class="dock-icon" data-app="favourites">
+        <div class="tray">
+          <svg class="glyph" viewBox="0 0 24 24" fill="#fff" stroke="none">
+            <path d="M12 1 L13.91 7.38 L19.78 4.22 L16.62 10.09 L23 12 L16.62 13.91 L19.78 19.78 L13.91 16.62 L12 23 L10.09 16.62 L4.22 19.78 L7.38 13.91 L1 12 L7.38 10.09 L4.22 4.22 L10.09 7.38 Z"/>
           </svg>
         </div>
       </div>
@@ -630,13 +634,25 @@
         </div>
       </div>
     </div>
-    <!-- Collapsed indicator: 5 dots replace the icon row after commit -->
+    <!-- Collapsed indicator: 5 glyphs replace the icon row after commit.
+         Order matches the dock: search · fav · recents · notif · qs.
+         Recents (centre) is the default active. -->
     <div id="dock-dots">
-      <span class="ndot" data-non-viewer></span>
-      <span class="ndot" data-non-viewer></span>
-      <span class="ndot on"></span>
-      <span class="ndot"></span>
-      <span class="ndot"></span>
+      <span class="ndot" data-non-viewer>
+        <svg viewBox="0 0 16 16"><path d="M8 15L14.6798 8.47036C17.5 5.71361 15.5026 1 11.5143 1H4.48566C0.49736 1 -1.49999 5.71361 1.32017 8.47036L8 15Z"/></svg>
+      </span>
+      <span class="ndot">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>
+      </span>
+      <span class="ndot on">
+        <svg viewBox="0 0 16 16"><rect width="16" height="16"/></svg>
+      </span>
+      <span class="ndot">
+        <svg viewBox="0 0 16 16"><path d="M0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8V16H0V8Z"/></svg>
+      </span>
+      <span class="ndot">
+        <svg viewBox="0 0 16 16"><rect width="16" height="5.90928"/><rect y="10.0908" width="16" height="5.90928"/></svg>
+      </span>
     </div>
   </div>
 
@@ -656,12 +672,8 @@
     <div id="keyboard"></div>
   </div>
 
-  <!-- Favourites fan-out (4 apps) -->
-  <div id="fav-fan"></div>
-
   <!-- Corner toggles -->
   <div id="edge-toggle"      class="corner-toggle">Edges: OFF</div>
-  <div id="favs-toggle"      class="corner-toggle">Favs: ON</div>
   <div id="dock-fill-toggle" class="corner-toggle">Dock BG: ON</div>
 
   <!-- Bottom edge -->
@@ -679,7 +691,6 @@ const appStrip     = document.getElementById('app-strip');
 const recentsPreview = document.getElementById('recents-preview');
 const recentsTrack = document.getElementById('recents-track');
 const recentsBg    = document.getElementById('recents-bg');
-const favFan       = document.getElementById('fav-fan');
 const panels       = document.getElementById('panels');
 const panelsTrack  = document.getElementById('panels-track');
 const navDots      = Array.from(document.querySelectorAll('.ndot'));
@@ -740,7 +751,6 @@ function commitSearch() {         // lock open on release
   searchLatched = true;
   searchOverlay.classList.add('open');
   recentsBg.classList.add('visible');
-  closeFan();
 }
 
 const FRAME_H   = 620;
@@ -748,14 +758,6 @@ const DOCK_TOP  = FRAME_H - 26 - 78;   // y of the dock's top within the frame =
 const RUNNING_INDEX = 2;               // centre slot
 
 /* ---------- apps / recents data ---------- */
-// Favourites = the 4 quick-access apps that live inside the folder
-const FAVOURITES = [
-  { icon: 'icons/notes-app-icon.png',    color: '#BEDE72' },
-  { icon: 'icons/camera-app-icon.png',   color: '#FFBBBC' },
-  { icon: 'icons/music-app-icon.png',    color: '#D4B2FF' },
-  { icon: 'icons/settings-app-icon.png', color: '#9AD0EC' },
-];
-
 let recents = ['recents/1.png', 'recents/2.png', 'recents/3.png']; // [0] = most recent
 let currentApp = null;  // foreground app key, null on home
 
@@ -830,43 +832,22 @@ function closeViewerPreview() {
   if (!recentsLatched) recentsBg.classList.remove('visible');
 }
 
-/* ---------- favourites fan-out ---------- */
-const favTiles = [];
-FAVOURITES.forEach((f, i) => {
-  const img = document.createElement('img');
-  img.className = 'fav-tile';
-  img.src = f.icon;
-  img.dataset.fav = i;
-  favFan.appendChild(img);
-  favTiles.push(img);
-});
-let favSelected = -1;
-
-function setFavSel(i) {
-  if (i === favSelected) return;
-  favTiles.forEach((t, k) => t.classList.toggle('sel', k === i));
-  favSelected = i;
-}
-function closeFan() {
-  favFan.classList.remove('open');
-  setFavSel(-1);
-}
-
-/* ---------- notifications / quick-settings panels ---------- */
-// Viewer indices: 0 = recents, 1 = notifications, 2 = quick-settings
+/* ---------- viewer panels (4 of them) ---------- */
+// Viewer carousel order: 0 = fav, 1 = recents, 2 = notif, 3 = qs.
 let panelsLatched = false;
-let panelIndex = 0;
+let panelIndex = 1;                            // default to recents
 // Two-stage gesture: stage-1 = arc dock revealed over running app, no commit yet.
-// Stage-2 = a second drag from the dock picks a surface (recents / notif / qs / fav / search).
+// Stage-2 = a second drag from the dock picks a surface (fav / recents / notif / qs / search).
 let dockStaged = false;
 
-// Maps viewer index (0=recents, 1=notif, 2=qs) → dot index (2/3/4)
-const VIEWER_DOT_INDEX = [2, 3, 4];
+// Maps viewer index (0=fav, 1=recents, 2=notif, 3=qs) → dot index in the dock (1/2/3/4)
+const VIEWER_DOT_INDEX = [1, 2, 3, 4];
 function setPanelIndex(i) {
-  panelIndex = Math.max(0, Math.min(2, i));
+  panelIndex = Math.max(0, Math.min(3, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
   navDots.forEach((d, k) => d.classList.toggle('on', k === VIEWER_DOT_INDEX[panelIndex]));
-  recentsLatched = panelsLatched && panelIndex === 0;
+  // 'recents' is panel 1
+  recentsLatched = panelsLatched && panelIndex === 1;
 }
 // Collapse the dock's icon row into the 5-dot indicator. We mirror the
 // state onto #frame too so panel contents can shift down into the space
@@ -878,7 +859,6 @@ function stageDock() {
   dockStaged = true;
   dock.classList.add('revealed');
   expandNav();
-  closeFan();
   closeViewerPreview();                          // tear down any live recents/notif/qs preview
   hideSearch();
   recentsBg.classList.add('visible', 'light');   // soft dim so dock pops over the app
@@ -995,11 +975,11 @@ function setActive(index) {
 // commit. Favourites (fan) and search (keyboard) are still safe to preview
 // because they're not sheets that compete with the dock motion.
 const SURFACE_PREVIEW = {
-  running:       () => { closeFan(); closeViewerPreview(); hideSearch(); },
-  favourites:    () => { closeViewerPreview(); hideSearch(); favFan.classList.add('open'); },
-  notifications: () => { closeFan(); closeViewerPreview(); hideSearch(); },
-  quicksettings: () => { closeFan(); closeViewerPreview(); hideSearch(); },
-  search:        () => { closeFan(); closeViewerPreview(); showSearch(); },
+  running:       () => { closeViewerPreview(); hideSearch(); },
+  favourites:    () => { closeViewerPreview(); hideSearch(); },
+  notifications: () => { closeViewerPreview(); hideSearch(); },
+  quicksettings: () => { closeViewerPreview(); hideSearch(); },
+  search:        () => { closeViewerPreview(); showSearch(); },
 };
 function updateOverview() {
   if (!dock.classList.contains('revealed')) return;
@@ -1009,22 +989,12 @@ function updateOverview() {
   (SURFACE_PREVIEW[app] || (() => {}))();
 }
 
-// Pick the active dock slot — but while the finger is up in the open
-// favourites fan, stay on favourites and select a fan tile instead.
+// Pick the active dock slot under the finger. Over a gap → no slot armed:
+// snap back to the running centre so a release lands in stage-1 instead of
+// accidentally committing a neighbour.
 function updateActiveAndFan(px, py) {
-  const aboveDock = py < (gestureFrameRect.top + DOCK_TOP - 4);
-  if (activeApp() === 'favourites' && favFan.classList.contains('open') && aboveDock) {
-    setFavSel(nearestFavIndex(px));
-    return;
-  }
   const hit = hitIconIndex(px);
-  // Over a gap → no slot armed: snap back to the running centre so a release
-  // here lands in stage-1 instead of accidentally committing a neighbour.
   setActive(hit === -1 ? RUNNING_INDEX : hit);
-  if (activeApp() === 'favourites') {
-    favFan.classList.add('open');
-    setFavSel(-1);
-  }
 }
 
 // Index of the element whose horizontal centre is nearest the pointer X.
@@ -1050,7 +1020,6 @@ function hitIconIndex(px) {
   }
   return -1;
 }
-const nearestFavIndex  = (px) => nearestByX(favTiles, px);
 
 /* ---------- bottom-edge gesture: swipe UP = overview, swipe L/R = app-switch ---------- */
 swipeZone.addEventListener('pointerdown', (e) => {
@@ -1175,13 +1144,7 @@ function routeRelease() {
     if (currentApp) startMinimize();
     latchRecents();
   } else if (app === 'favourites') {
-    if (favSelected >= 0) {
-      const fav = FAVOURITES[favSelected];
-      collapseAll();
-      openApp(fav.color);   // bonus: launch a fanned app
-    } else {
-      goHome();             // releasing on the home icon → home
-    }
+    commitDrawer('fav');
   } else if (app === 'notifications' || app === 'quicksettings') {
     commitDrawer(app === 'quicksettings' ? 'qs' : 'notif');
   } else { // search
@@ -1202,22 +1165,22 @@ function snapPanelIndex(i) {
 }
 
 // The drawer is already shown live by the drag — just lock it open on release.
+// 'which' maps to a panel index: fav=0, notif=2, qs=3 (recents=1 handled by latchRecents).
 function commitDrawer(which) {
   panelsLatched = true;                       // lock before setPanelIndex so recentsLatched derives correctly
-  snapPanelIndex(which === 'qs' ? 2 : 1);
+  const idx = which === 'fav' ? 0 : which === 'qs' ? 3 : 2;
+  snapPanelIndex(idx);
   panels.classList.add('open');
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
   dock.classList.add('revealed');
   collapseNav();                              // icons fade to 5-dot indicator
-  closeFan();
 }
 
 function collapseAll() {
   dockStaged = false;
   dock.classList.remove('revealed');
   expandNav();
-  closeFan();
   hideSearch();
   panels.classList.remove('open');
   recentsBg.classList.remove('visible', 'light');
@@ -1226,13 +1189,14 @@ function collapseAll() {
 }
 function latchRecents() {
   panelsLatched = true;
-  snapPanelIndex(0);                           // also sets recentsLatched=true (via setPanelIndex)
+  snapPanelIndex(1);                           // recents = panel index 1
+  panels.classList.add('open');
+  recentsBg.classList.add('visible');
   panels.classList.add('open');
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
   dock.classList.add('revealed');
   collapseNav();                               // icons fade to 5-dot indicator
-  closeFan();
 }
 function unlatchRecents() {
   panelsLatched = false;
@@ -1464,7 +1428,6 @@ function wireToggle(id, cls, labelOn, labelOff, startOn) {
 }
 wireToggle('dock-fill-toggle', 'dock-bare',  'Dock BG: OFF', 'Dock BG: ON',  true);
 wireToggle('edge-toggle',      'show-edges', 'Edges: ON',    'Edges: OFF',   false);
-wireToggle('favs-toggle',      'no-favs',    'Favs: OFF',    'Favs: ON',     false);
 
 buildRecentsPreview();
 </script>
