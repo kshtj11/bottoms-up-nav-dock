@@ -1359,8 +1359,11 @@ dock.addEventListener('pointerdown', (e) => {
       return;
     }
     if (!moved && wasStaged) {
-      // Pure tap while stage-1 → re-stage (stay revealed, no commit)
-      stageDock();
+      // Pure tap while stage-1 (dockStaged): commit the icon under the
+      // finger — pointerdown already set activeIndex via the tray hit-test.
+      // If they tapped a gap between icons (snapped back to centre), this
+      // commits recents; otherwise it commits whichever surface they tapped.
+      routeRelease();
       return;
     }
     routeRelease();
