@@ -101,13 +101,11 @@
     overflow: visible;
     pointer-events: auto;
   }
-  /* Soft top/bottom fade so the carousel doesn't visually run into the
-     dim home content above or the dock-dot strip below. */
+  /* Recents panel: solid black surface behind the carousel so the home/app
+     underneath doesn't show through (matches the notif/qs sheet feel). */
   .panel[data-panel="recents"] {
-    -webkit-mask-image: linear-gradient(to bottom,
-      transparent 0, #000 56px, #000 calc(100% - 96px), transparent 100%);
-            mask-image: linear-gradient(to bottom,
-      transparent 0, #000 56px, #000 calc(100% - 96px), transparent 100%);
+    background: #000;
+    background: color(display-p3 0 0 0);
   }
   /* legacy class hooks kept as no-ops so older callers don't have to be ripped out */
   #recents-preview.visible,
@@ -224,6 +222,27 @@
   .ndot.on { background: #fff; transform: scale(1.6); }
   /* search & home dots greyed (non-swipeable in option A) */
   .ndot[data-non-viewer] { background: rgba(255,255,255,0.18); }
+
+  /* Solid black plate that sits behind the dock area whenever the dock
+     is visible but no committed panel is covering it (i.e. stage-1).
+     Once a panel commits, the panel itself provides the background and
+     the plate fades out. */
+  #dock-plate {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 130px;
+    background: #000;
+    background: color(display-p3 0 0 0);
+    z-index: 19;            /* under #dock (20), above app/dim */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s cubic-bezier(0.22,1,0.36,1);
+  }
+  /* Modern browsers: turn it on when the dock is revealed AND no panel
+     is committed open. */
+  #frame:has(#dock.revealed):not(:has(#panels.open)) #dock-plate { opacity: 1; }
 
   /* ===================== Dock ===================== */
   #dock {
@@ -550,6 +569,9 @@
       </div>
     </div>
   </div>
+  <!-- Solid plate behind the dock in stage-1 -->
+  <div id="dock-plate"></div>
+
   <!-- Dock -->
   <div id="dock">
     <div id="dock-row">
