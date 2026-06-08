@@ -1055,7 +1055,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
 
     if (!mode) {
       const up = startY0 - e2.clientY;            // up = the primary gesture
-      if (up > 16) {
+      if (up > 24) {
         mode = 'reveal';
         revealed = true;
         revealedAt = performance.now();
