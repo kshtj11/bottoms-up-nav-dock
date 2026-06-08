@@ -165,7 +165,7 @@
   }
   #panels-track {
     display: flex;
-    width: 2160px;         /* four 540 panels side by side: fav | recents | notif | qs */
+    width: 2700px;         /* five 540 panels side by side: fav | search | recents | notif | qs */
     height: 100%;
     will-change: transform;
     transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
@@ -182,9 +182,10 @@
      they end just above the dot strip (using the space that the icon row
      used to occupy). 78px (icon dock) − 22px (dots) = 56px gained. */
   #frame.dock-collapsed .panel { transform: translateY(56px); transition: transform 0.20s cubic-bezier(0.22,1,0.36,1); }
-  /* Opaque viewers (favourites, notifications, quick-settings) — solid sheet
-     so the home/app behind doesn't bleed through. */
+  /* Opaque viewers (favourites, search, notifications, quick-settings) —
+     solid sheet so the home/app behind doesn't bleed through. */
   .panel[data-panel="fav"],
+  .panel[data-panel="search"],
   .panel[data-panel="notif"],
   .panel[data-panel="qs"] {
     background: #111;
@@ -364,24 +365,10 @@
     display: block;
   }
 
-  /* ===================== Search (bar + keyboard + results) ===================== */
-  #search-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 25;            /* above the dock, below the edge/toggles */
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.24s ease;
-    background: #000;
-    background: color(display-p3 0 0 0);
-  }
-  #search-overlay.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* results fill the area above the search bar */
-  #search-results {
+  /* ===================== Search panel (results + bar + keyboard) =====================
+     Lives inside the carousel as a regular .panel; the whole panel slides
+     up on commit, so the search bar and keyboard are static within. */
+  .panel[data-panel="search"] .search-results {
     position: absolute;
     left: 0; top: 64px;
     width: 540px; bottom: 300px;
@@ -389,10 +376,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    opacity: 0;
-    transition: opacity 0.2s ease 0.06s;
   }
-  #search-overlay.open #search-results { opacity: 1; }
   .sr-row {
     height: 64px;
     border-radius: 16px;
@@ -407,13 +391,12 @@
   .sr-lines { display: flex; flex-direction: column; gap: 8px; }
   .sr-line { height: 11px; border-radius: 6px; background: rgba(255,255,255,0.20); }
 
-  /* search bar — starts at the icon size, expands horizontally */
-  #search-bar {
+  .panel[data-panel="search"] .search-bar {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 246px;          /* sits just above the keyboard */
-    width: 64px;            /* collapsed = dock icon size */
+    bottom: 246px;
+    width: 500px;
     height: 48px;
     background: #2A2A2A;
     border-radius: 24px;
@@ -423,22 +406,17 @@
     padding: 0 18px;
     overflow: hidden;
     white-space: nowrap;
-    transition: width 0.3s cubic-bezier(0.22,1,0.36,1);
   }
-  #search-overlay.open #search-bar { width: 500px; }
-  #search-bar svg { width: 22px; height: 22px; flex: none; }
-  #search-bar .sb-text { font-family: 'Inter', sans-serif; font-size: 18px; color: #8A8A8A; }
+  .panel[data-panel="search"] .search-bar svg { width: 22px; height: 22px; flex: none; }
+  .panel[data-panel="search"] .search-bar .sb-text { font-family: 'Inter', sans-serif; font-size: 18px; color: #8A8A8A; }
 
-  /* QWERTY keyboard — slides up from the bottom (visual only) */
-  #keyboard {
+  /* QWERTY keyboard — static at the bottom of the search panel */
+  .panel[data-panel="search"] .keyboard {
     position: absolute;
     left: 0; bottom: 0;
     width: 540px; height: 230px;
     background: #000000;
-    transform: translateY(100%);
-    transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
   }
-  #search-overlay.open #keyboard { transform: translateY(0); }
   .kb-row {
     position: absolute;
     display: flex;
@@ -549,6 +527,21 @@
         <div class="fav-tile" style="left:282px;top:177px;background:#A8E6CF"></div>
         <div class="fav-tile" style="left:403px;top:177px;background:#FFEAA7"></div>
       </div>
+      <!-- Search: results + bar + keyboard -->
+      <div class="panel" data-panel="search">
+        <div class="search-results">
+          <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:180px"></div><div class="sr-line" style="width:110px"></div></div></div>
+          <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:140px"></div><div class="sr-line" style="width:90px"></div></div></div>
+          <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:200px"></div><div class="sr-line" style="width:130px"></div></div></div>
+        </div>
+        <div class="search-bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="15.5" y1="15.5" x2="21" y2="21"></line>
+          </svg>
+          <span class="sb-text">Search apps, settings, web</span>
+        </div>
+        <div class="keyboard"></div>
+      </div>
       <!-- Recents (cards) -->
       <div class="panel" data-panel="recents">
         <div id="recents-preview">
@@ -657,22 +650,6 @@
     </div>
   </div>
 
-  <!-- Search overlay: results + expanding bar + keyboard -->
-  <div id="search-overlay">
-    <div id="search-results">
-      <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:180px"></div><div class="sr-line" style="width:110px"></div></div></div>
-      <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:140px"></div><div class="sr-line" style="width:90px"></div></div></div>
-      <div class="sr-row"><div class="sr-ico"></div><div class="sr-lines"><div class="sr-line" style="width:200px"></div><div class="sr-line" style="width:130px"></div></div></div>
-    </div>
-    <div id="search-bar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/>
-      </svg>
-      <span class="sb-text">Search apps, settings, web</span>
-    </div>
-    <div id="keyboard"></div>
-  </div>
-
   <!-- Corner toggles -->
   <div id="edge-toggle"      class="corner-toggle">Edges: OFF</div>
   <div id="dock-fill-toggle" class="corner-toggle">Dock BG: ON</div>
@@ -695,7 +672,6 @@ const recentsBg    = document.getElementById('recents-bg');
 const panels       = document.getElementById('panels');
 const panelsTrack  = document.getElementById('panels-track');
 const navDots      = Array.from(document.querySelectorAll('.ndot'));
-const searchOverlay = document.getElementById('search-overlay');
 
 /* ---------- keyboard (visual only, built once) ---------- */
 const KB_ROWS = [
@@ -715,7 +691,8 @@ const KB_ROWS = [
   ]},
 ];
 (function buildKeyboard() {
-  const kb = document.getElementById('keyboard');
+  const kb = document.querySelector('.panel[data-panel="search"] .keyboard');
+  if (!kb) return;
   KB_ROWS.forEach(row => {
     const r = document.createElement('div');
     r.className = 'kb-row';
@@ -740,19 +717,9 @@ const KB_ROWS = [
   });
 })();
 
-let searchLatched = false;
-function showSearch() {           // live preview during the drag
-  searchOverlay.classList.add('open');
-  recentsBg.classList.add('visible');
-}
-function hideSearch() {
-  searchOverlay.classList.remove('open');
-}
-function commitSearch() {         // lock open on release
-  searchLatched = true;
-  searchOverlay.classList.add('open');
-  recentsBg.classList.add('visible');
-}
+// Search now lives inside the carousel as a regular .panel — there is no
+// separate overlay, no separate latched flag. Commit/dismiss go through the
+// shared panels machinery.
 
 const FRAME_H   = 620;
 const DOCK_TOP  = FRAME_H - 26 - 78;   // y of the dock's top within the frame = 516
@@ -833,25 +800,35 @@ function closeViewerPreview() {
   if (!recentsLatched) recentsBg.classList.remove('visible');
 }
 
-/* ---------- viewer panels (4 of them) ---------- */
-// Viewer carousel order: 0 = fav, 1 = recents, 2 = notif, 3 = qs.
+/* ---------- viewer panels (5 of them) ---------- */
+// Carousel order: 0=fav, 1=search, 2=recents, 3=notif, 4=qs.
 let panelsLatched = false;
-let panelIndex = 1;                            // default to recents
+let panelIndex = 2;                            // default to recents
 // Two-stage gesture: stage-1 = arc dock revealed over running app, no commit yet.
-// Stage-2 = a second drag from the dock picks a surface (fav / recents / notif / qs / search).
+// Stage-2 = a second drag from the dock picks a surface (fav / search /
+// recents / notif / qs).
 let dockStaged = false;
 
-// Maps viewer index (0=fav, 1=recents, 2=notif, 3=qs) → dot index in the
-// minimised indicator. Dot order matches the dock: fav · search · recents
-// · notif · qs, so fav→0, recents→2, notif→3, qs→4 (search at dot 1 is the
-// non-viewer).
-const VIEWER_DOT_INDEX = [0, 2, 3, 4];
+// Maps panel index → dot index. With the carousel now matching the dock
+// 1:1 (fav · search · recents · notif · qs), it's a straight identity.
+const VIEWER_DOT_INDEX = [0, 1, 2, 3, 4];
 function setPanelIndex(i) {
-  panelIndex = Math.max(0, Math.min(3, i));
+  panelIndex = Math.max(0, Math.min(4, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
   navDots.forEach((d, k) => d.classList.toggle('on', k === VIEWER_DOT_INDEX[panelIndex]));
-  // 'recents' is panel 1
-  recentsLatched = panelsLatched && panelIndex === 1;
+  recentsLatched = panelsLatched && panelIndex === 2;
+  // Search panel hides the dock (the keyboard fills the bottom). Every
+  // other latched panel shows the collapsed-dot dock.
+  if (panelsLatched) {
+    if (panelIndex === 1) {
+      dock.classList.remove('revealed');
+      frame.classList.remove('dock-collapsed');
+    } else {
+      dock.classList.add('revealed');
+      dock.classList.add('collapsed');
+      frame.classList.add('dock-collapsed');
+    }
+  }
 }
 // Collapse the dock's icon row into the 5-dot indicator. We mirror the
 // state onto #frame too so panel contents can shift down into the space
@@ -864,7 +841,6 @@ function stageDock() {
   dock.classList.add('revealed');
   expandNav();
   closeViewerPreview();                          // tear down any live recents/notif/qs preview
-  hideSearch();
   recentsBg.classList.add('visible', 'light');   // soft dim so dock pops over the app
 }
 function unstageDock() {
@@ -979,18 +955,16 @@ function setActive(index) {
 // commit. Favourites (fan) and search (keyboard) are still safe to preview
 // because they're not sheets that compete with the dock motion.
 const SURFACE_PREVIEW = {
-  running:       () => { closeViewerPreview(); hideSearch(); },
-  favourites:    () => { closeViewerPreview(); hideSearch(); },
-  notifications: () => { closeViewerPreview(); hideSearch(); },
-  quicksettings: () => { closeViewerPreview(); hideSearch(); },
-  search:        () => { closeViewerPreview(); showSearch(); },
+  running:       () => { closeViewerPreview(); },
+  favourites:    () => { closeViewerPreview(); },
+  notifications: () => { closeViewerPreview(); },
+  quicksettings: () => { closeViewerPreview(); },
+  search:        () => { closeViewerPreview(); },
 };
 function updateOverview() {
   if (!dock.classList.contains('revealed')) return;
   recentsBg.classList.add('visible'); // dim always sits over the home/app behind
-  const app = activeApp();
-  if (app !== 'search') hideSearch();
-  (SURFACE_PREVIEW[app] || (() => {}))();
+  (SURFACE_PREVIEW[activeApp()] || (() => {}))();
 }
 
 // Pick the active dock slot under the finger. Over a gap → no slot armed:
@@ -1031,7 +1005,6 @@ swipeZone.addEventListener('pointerdown', (e) => {
   // dismiss any open overview first
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
-  if (searchLatched) { searchLatched = false; hideSearch(); }
   if (dockStaged)  unstageDock();                 // fresh swipe wipes any prior stage-1
   expandNav();                                    // fresh swipe re-shows the icon row
 
@@ -1149,11 +1122,10 @@ function routeRelease() {
     latchRecents();
   } else if (app === 'favourites') {
     commitDrawer('fav');
+  } else if (app === 'search') {
+    commitDrawer('search');
   } else if (app === 'notifications' || app === 'quicksettings') {
     commitDrawer(app === 'quicksettings' ? 'qs' : 'notif');
-  } else { // search
-    dock.classList.remove('revealed'); // keyboard covers the dock in search mode
-    commitSearch();
   }
 }
 
@@ -1168,24 +1140,29 @@ function snapPanelIndex(i) {
   panelsTrack.style.transition = '';
 }
 
-// The drawer is already shown live by the drag — just lock it open on release.
-// 'which' maps to a panel index: fav=0, notif=2, qs=3 (recents=1 handled by latchRecents).
+// Locks the chosen panel open on release. 'which' → panel index:
+//   fav=0, search=1, recents=2, notif=3, qs=4.
+// setPanelIndex (called via snapPanelIndex) is responsible for syncing the
+// dock state — collapsed dots for the 4 viewer panels, fully hidden for
+// the search panel since the keyboard fills the bottom.
 function commitDrawer(which) {
   panelsLatched = true;                       // lock before setPanelIndex so recentsLatched derives correctly
-  const idx = which === 'fav' ? 0 : which === 'qs' ? 3 : 2;
-  snapPanelIndex(idx);
+  const idx = which === 'fav' ? 0
+           : which === 'search' ? 1
+           : which === 'qs' ? 4
+           : which === 'notif' ? 3
+           : 2;                               // recents
+  snapPanelIndex(idx);                        // setPanelIndex syncs dock state
   panels.classList.add('open');
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
-  dock.classList.add('revealed');
-  collapseNav();                              // icons fade to 5-dot indicator
+  // setPanelIndex already collapsed the dock (or hid it for search)
 }
 
 function collapseAll() {
   dockStaged = false;
   dock.classList.remove('revealed');
   expandNav();
-  hideSearch();
   panels.classList.remove('open');
   recentsBg.classList.remove('visible', 'light');
   panelsLatched = false;
@@ -1193,14 +1170,11 @@ function collapseAll() {
 }
 function latchRecents() {
   panelsLatched = true;
-  snapPanelIndex(1);                           // recents = panel index 1
-  panels.classList.add('open');
-  recentsBg.classList.add('visible');
+  snapPanelIndex(2);                           // recents = panel index 2
   panels.classList.add('open');
   recentsBg.classList.add('visible');
   recentsBg.classList.remove('light');
-  dock.classList.add('revealed');
-  collapseNav();                               // icons fade to 5-dot indicator
+  // setPanelIndex already collapsed the dock
 }
 function unlatchRecents() {
   panelsLatched = false;
@@ -1211,7 +1185,7 @@ function unlatchRecents() {
   expandNav();
 }
 function goHome() {
-  recentsLatched = panelsLatched = searchLatched = false;
+  recentsLatched = panelsLatched = false;
   currentApp = null;
   resetAppScreen();
   recentsPreview.classList.remove('no-scale');
@@ -1392,31 +1366,6 @@ frame.addEventListener('pointerdown', (e) => {
   if (recentsLatched) unlatchRecents();
   if (panelsLatched) hidePanels();
   if (dockStaged)   unstageDock();
-});
-
-/* ===================== search: swipe down to dismiss ===================== */
-let sDragging = false, sStartY = 0;
-searchOverlay.addEventListener('pointerdown', (e) => {
-  if (!searchLatched) return;
-  sDragging = true;
-  sStartY = e.clientY;
-  searchOverlay.setPointerCapture(e.pointerId);
-});
-searchOverlay.addEventListener('pointermove', (e) => {
-  if (!sDragging) return;
-  const dy = e.clientY - sStartY;
-  if (dy > 0) {
-    searchOverlay.style.transition = 'none';
-    searchOverlay.style.transform = `translateY(${dy}px)`;
-  }
-});
-searchOverlay.addEventListener('pointerup', (e) => {
-  if (!sDragging) return;
-  sDragging = false;
-  const dy = e.clientY - sStartY;
-  searchOverlay.style.transition = '';
-  searchOverlay.style.transform = '';
-  if (dy > 90) { searchLatched = false; hideSearch(); recentsBg.classList.remove('visible'); }
 });
 
 /* ===================== corner toggles ===================== */
