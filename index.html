@@ -1102,10 +1102,22 @@ swipeZone.addEventListener('pointerdown', (e) => {
     if (mode === 'reveal') {
       const now = performance.now(), dt = now - prevT;
       if (dt > 0) { velocity = (prevY - e2.clientY) / dt; prevT = now; prevY = e2.clientY; }
+      const up = startY0 - e2.clientY;
+      // Reversed direction past the activation threshold — close the dock
+      // immediately and reset the gesture so re-swiping up can re-open it.
+      if (up < 8) {
+        dock.classList.remove('revealed');
+        recentsBg.classList.remove('visible', 'light');
+        dockIcons.forEach(ic => ic.classList.remove('active'));
+        activeIndex = RUNNING_INDEX;
+        revealed = false;
+        selectLive = false;
+        mode = null;
+        return;
+      }
       // Selection only goes live past the reveal-travel window AND a short
       // dwell, so the user can actually see the icons land before the dock
       // starts tracking the finger to a slot.
-      const up = startY0 - e2.clientY;
       if (!selectLive && up > 56 && (now - revealedAt) > 220) selectLive = true;
       if (selectLive) updateActiveAndFan(e2.clientX, e2.clientY);
     } else if (mode === 'switch') {
