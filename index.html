@@ -1037,7 +1037,6 @@ swipeZone.addEventListener('pointerdown', (e) => {
   let revealed = false;
   let revealedAt = 0;              // ms timestamp when arc dock popped
   let selectLive = false;          // true once finger past travel + dwell — slot tracking on
-  let minimizedThisGesture = false; // true if startMinimize fired on reveal
   let prevY = startY0, prevT = performance.now(), velocity = 0;
   let hPrevX = startX, hPrevT = prevT, hVel = 0;
   dragging = true;
@@ -1061,13 +1060,9 @@ swipeZone.addEventListener('pointerdown', (e) => {
         revealed = true;
         revealedAt = performance.now();
         dock.classList.add('revealed');
-        // Start minimizing the foreground app the instant the swipe begins —
-        // the user sees the app shrink toward its recents-card slot in
-        // parallel with the dock rising. By the time they pick a surface and
-        // release, the heavy zoom is already done; commit just slides the
-        // chosen panel in. The app becomes a recents card regardless of which
-        // surface they end up committing to.
-        if (currentApp) { startMinimize(); minimizedThisGesture = true; }
+        // Dock just overlays whatever's behind (app or home). The app stays
+        // full-size; we only minimize it if the user actually commits to
+        // recents on release. Notif/qs/home/search leave the app alone.
       } else if (currentApp && recents.length >= 2 && adx > 44 && adx > ady * 3) {
         // app-switch is secondary: needs a long, near-flat sideways drag
         mode = 'switch';
@@ -1105,14 +1100,18 @@ swipeZone.addEventListener('pointerdown', (e) => {
       // commit.
       if (!selectLive) { stageDock(); return; }
       if (activeIndex === RUNNING_INDEX) {
-        // Centre release. Three cases:
-        //  (a) minimize already ran → app is a card, show recents.
-        //  (b) the user kept dragging well past the live-window (> 180 px
-        //      up from the start) → they're clearly committing to recents
-        //      in one continuous motion. Open recents directly.
-        //  (c) shorter centred release → stage-1 latch (the two-stage flow).
+        // Centre release. Two cases:
+        //  (a) long continuous upward swipe (> 180 px) → they're committing
+        //      to recents in one motion. Minimize the foreground app (if
+        //      any) into its card slot, then latch recents.
+        //  (b) shorter centred release → stage-1 latch (dock parked over
+        //      the app; no minimize, the app stays full-size behind).
         const upTravel = startY0 - e2.clientY;
-        if (minimizedThisGesture || upTravel > 180) { latchRecents(); return; }
+        if (upTravel > 180) {
+          if (currentApp) startMinimize();
+          latchRecents();
+          return;
+        }
         stageDock(); return;
       }
       routeRelease();
@@ -1130,8 +1129,8 @@ swipeZone.addEventListener('pointerdown', (e) => {
 function routeRelease() {
   const app = activeApp();
   if (app === 'running') {
-    // startMinimize already fired on swipe-up reveal; this just locks the
-    // recents panel open over the already-shrunken card.
+    // Recents was actually chosen — NOW fire the minimize (the swipe
+    // reveal only overlaid the dock, the app was still full-size).
     if (currentApp) startMinimize();
     latchRecents();
   } else if (app === 'favourites') {
