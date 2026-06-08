@@ -635,13 +635,14 @@
       </div>
     </div>
     <!-- Collapsed indicator: 5 glyphs replace the icon row after commit.
-         Order matches the dock: search · fav · recents · notif · qs.
-         Recents (centre) is the default active. -->
+         Order matches the dock: fav (teardrop) · search (circle) · recents
+         (square) · notif (arch) · qs (2-bar). Recents = default active.
+         The circle is the search glyph (non-swipeable). -->
     <div id="dock-dots">
-      <span class="ndot" data-non-viewer>
+      <span class="ndot">
         <svg viewBox="0 0 16 16"><path d="M8 15L14.6798 8.47036C17.5 5.71361 15.5026 1 11.5143 1H4.48566C0.49736 1 -1.49999 5.71361 1.32017 8.47036L8 15Z"/></svg>
       </span>
-      <span class="ndot">
+      <span class="ndot" data-non-viewer>
         <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>
       </span>
       <span class="ndot on">
@@ -840,8 +841,11 @@ let panelIndex = 1;                            // default to recents
 // Stage-2 = a second drag from the dock picks a surface (fav / recents / notif / qs / search).
 let dockStaged = false;
 
-// Maps viewer index (0=fav, 1=recents, 2=notif, 3=qs) → dot index in the dock (1/2/3/4)
-const VIEWER_DOT_INDEX = [1, 2, 3, 4];
+// Maps viewer index (0=fav, 1=recents, 2=notif, 3=qs) → dot index in the
+// minimised indicator. Dot order matches the dock: fav · search · recents
+// · notif · qs, so fav→0, recents→2, notif→3, qs→4 (search at dot 1 is the
+// non-viewer).
+const VIEWER_DOT_INDEX = [0, 2, 3, 4];
 function setPanelIndex(i) {
   panelIndex = Math.max(0, Math.min(3, i));
   panelsTrack.style.transform = `translateX(${-540 * panelIndex}px)`;
