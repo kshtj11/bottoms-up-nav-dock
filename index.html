@@ -183,7 +183,7 @@
   /* When the dock has collapsed to dots, shift the panel contents down so
      they end just above the dot strip (using the space that the icon row
      used to occupy). 78px (icon dock) − 22px (dots) = 56px gained. */
-  #frame.dock-collapsed .panel { transform: translateY(56px); }
+  #frame.dock-collapsed .panel { transform: translateY(56px); transition: transform 0.20s cubic-bezier(0.22,1,0.36,1); }
   /* Opaque viewers (notifications, quick-settings) — solid sheet so the
      home/app behind doesn't bleed through, with a tiny grabber header
      and a reserved bottom strip for the dock dots. */
@@ -212,8 +212,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.22s cubic-bezier(0.22,1,0.36,1),
-                transform 0.26s cubic-bezier(0.22,1,0.36,1);
+    transition: opacity 0.18s cubic-bezier(0.22,1,0.36,1),
+                transform 0.20s cubic-bezier(0.22,1,0.36,1);
     transform-origin: 50% 100%;            /* shrink toward the bottom strip */
   }
   #dock-row  { opacity: 1; transform: scale(1); }
@@ -250,9 +250,9 @@
     pointer-events: none;
     will-change: transform, opacity;
     transition: transform 0.26s cubic-bezier(0.22,1,0.36,1),
-                opacity 0.20s ease,
-                height 0.26s cubic-bezier(0.22,1,0.36,1),
-                background 0.22s ease;
+                opacity 0.18s ease,
+                height 0.20s cubic-bezier(0.22,1,0.36,1),
+                background 0.18s ease;
   }
   /* Collapsed (dots) state — dock visually collapses to just the dot strip
      at the bottom, no pill background. The icon row scales down as it
