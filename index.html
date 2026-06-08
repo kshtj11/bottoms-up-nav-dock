@@ -570,8 +570,9 @@
           </svg>
         </div>
       </div>
-      <!-- 2: Running apps (center, default active) -->
-      <div class="dock-icon running active" data-app="running">
+      <!-- 2: Running apps (center). Not pre-active — the .active class is
+           only added once the finger actually hits an icon during the drag. -->
+      <div class="dock-icon running" data-app="running">
         <div class="tray">
           <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="8" width="12" height="13" rx="2.5"/>
@@ -1044,8 +1045,7 @@ swipeZone.addEventListener('pointerdown', (e) => {
   gestureFrameRect = frame.getBoundingClientRect();
 
   dockIcons.forEach(ic => ic.classList.remove('active'));
-  activeIndex = RUNNING_INDEX;
-  dockIcons[RUNNING_INDEX].classList.add('active');
+  activeIndex = RUNNING_INDEX;   // logical default; no visual highlight until finger lands
   frame.setPointerCapture(e.pointerId);
 
   const onMove = (e2) => {
