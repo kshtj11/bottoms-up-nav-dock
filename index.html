@@ -153,6 +153,11 @@
     transform: translateY(100%);
     pointer-events: none;
     transition: transform 0.26s cubic-bezier(0.22,1,0.36,1);
+    /* Solid backdrop so the top strip is still covered when the dock-collapse
+       transform shifts each .panel down 56px. Slides up & down with the
+       panel; swipe-down dismiss still reveals the dim/home behind. */
+    background: #000;
+    background: color(display-p3 0 0 0);
   }
   #panels.open {
     transform: translateY(0);
