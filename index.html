@@ -289,8 +289,7 @@
     justify-content: center;
     align-items: center;
     padding: 0;
-    background: rgba(217, 217, 217, 0.2);
-    background: color(display-p3 0.851 0.851 0.851 / 0.2);
+    background: transparent;
     border-radius: 40px;
     z-index: 20;
     opacity: 0;
@@ -298,8 +297,7 @@
     will-change: transform, opacity;
     transition: transform 0.26s cubic-bezier(0.22,1,0.36,1),
                 opacity 0.18s ease,
-                height 0.20s cubic-bezier(0.22,1,0.36,1),
-                background 0.18s ease;
+                height 0.20s cubic-bezier(0.22,1,0.36,1);
   }
   /* Collapsed (dots) state — dock visually collapses to just the dot strip
      at the bottom, no pill background. The icon row scales down as it
@@ -307,7 +305,6 @@
      anywhere on the dots area expands it back to icon height. */
   #dock.collapsed {
     height: 22px;
-    background: transparent;
   }
   #dock.revealed {
     transform: translateX(-50%) translateY(0);
@@ -491,10 +488,8 @@
     cursor: pointer;
     user-select: none;
   }
-  #dock-fill-toggle { right: 8px; }
   #edge-toggle      { left: 8px; }
 
-  #frame.dock-bare #dock { background: transparent; }
   #frame.show-edges #deadzone,
   #frame.show-edges #swipe-zone { opacity: 0.10; }
 </style>
@@ -652,7 +647,6 @@
 
   <!-- Corner toggles -->
   <div id="edge-toggle"      class="corner-toggle">Edges: OFF</div>
-  <div id="dock-fill-toggle" class="corner-toggle">Dock BG: ON</div>
 
   <!-- Bottom edge -->
   <div id="deadzone"></div>
@@ -1379,7 +1373,6 @@ function wireToggle(id, cls, labelOn, labelOff, startOn) {
     el.textContent = on ? labelOn : labelOff;
   });
 }
-wireToggle('dock-fill-toggle', 'dock-bare',  'Dock BG: OFF', 'Dock BG: ON',  true);
 wireToggle('edge-toggle',      'show-edges', 'Edges: ON',    'Edges: OFF',   false);
 
 buildRecentsPreview();
